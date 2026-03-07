@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  PLATFORM_ADMIN
+}
+
+enum MemberRole {
+  OWNER
+  MEMBER
+}
+
+enum MirrorStatus {
+  UNKNOWN
+  ONLINE
+  OFFLINE
+}
+
+enum ModuleType {
+  CLOCK
+  WEATHER
+  TIMERS
+  CALENDAR
+  ATTENTION
+  TODOIST
+}
+
+enum TimerStatus {
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+enum VerificationPurpose {
+  LOGIN
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  displayName       String?
+  role              UserRole           @default(USER)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  memberships       HouseholdMember[]
+  requestedTimers   Timer[]            @relation("TimerRequestedBy")
+  sessions          Session[]
+  verificationCodes VerificationCode[]
+  createdPairings   MirrorPairingCode[] @relation("PairingCreatedBy")
+}
+
+model Household {
+  id          String            @id @default(cuid())
+  name        String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     HouseholdMember[]
+  mirrors     Mirror[]
+  pairingCodes MirrorPairingCode[]
+}
+
+model HouseholdMember {
+  id          String    @id @default(cuid())
+  householdId String
+  userId      String
+  role        MemberRole @default(MEMBER)
+  createdAt   DateTime   @default(now())
+  household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+}
+
+model Mirror {
+  id           String        @id @default(cuid())
+  householdId  String
+  name         String
+  status       MirrorStatus  @default(UNKNOWN)
+  locationName String?
+  latitude     Float?
+  longitude    Float?
+  timezone     String?       @default("Europe/Amsterdam")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  modules      MirrorModule[]
+  timers       Timer[]
+  claimSessions MirrorClaimSession[]
+}
+
+model MirrorModule {
+  id        String     @id @default(cuid())
+  mirrorId  String
+  type      ModuleType
+  enabled   Boolean    @default(true)
+  config    String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  mirror    Mirror     @relation(fields: [mirrorId], references: [id], onDelete: Cascade)
+
+  @@unique([mirrorId, type])
+}
+
+model Timer {
+  id              String      @id @default(cuid())
+  mirrorId        String
+  requestedById   String
+  durationSeconds Int
+  label           String?
+  greetingName    String?
+  startedAt       DateTime    @default(now())
+  endsAt          DateTime
+  status          TimerStatus @default(ACTIVE)
+  completedAt     DateTime?
+  announcedAt     DateTime?
+  mirror          Mirror      @relation(fields: [mirrorId], references: [id], onDelete: Cascade)
+  requestedBy     User        @relation("TimerRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([mirrorId, status, endsAt])
+}
+
+model MirrorPairingCode {
+  id          String    @id @default(cuid())
+  householdId String
+  token       String    @unique
+  displayCode String?   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
+  createdBy   User?     @relation("PairingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, expiresAt])
+}
+
+model MirrorClaimSession {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  expiresAt DateTime
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+  mirrorId  String?
+  mirror    Mirror?   @relation(fields: [mirrorId], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@index([mirrorId])
+}
+
+model VerificationCode {
+  id         String              @id @default(cuid())
+  userId     String
+  email      String
+  codeHash   String
+  purpose    VerificationPurpose @default(LOGIN)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, expiresAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}

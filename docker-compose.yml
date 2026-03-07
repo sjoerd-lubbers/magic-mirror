@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    container_name: magic-mirror-app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      APP_URL: http://localhost:3000
+      DATABASE_URL: file:/app/data/dev.db
+      AUTH_CODE_SECRET: change-me-in-production
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@magicmirror.local
+      OPENWEATHER_API_KEY: ""
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - mailhog
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: magic-mirror-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
