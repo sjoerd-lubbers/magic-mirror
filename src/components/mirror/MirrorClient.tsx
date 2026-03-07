@@ -516,9 +516,9 @@ export function MirrorClient({
 
                   return (
                     <li key={item.id} className="attention-row">
-                      <p className="attention-title">{item.label}</p>
                       <p className="attention-count">{counter.count}</p>
                       <p className="attention-subtitle">{counter.subtitle}</p>
+                      <p className="attention-title">{item.label}</p>
                     </li>
                   );
                 })}
