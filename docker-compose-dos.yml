@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    container_name: magic-mirror-app
+    # ports:
+    #   - "3000:3000"
+    environment:
+      NODE_ENV: production
+      APP_URL: ${APP_URL:-https://magic-mirror.ams8.nl}
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/dev.db}
+      AUTH_CODE_SECRET: ${AUTH_CODE_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      TODOIST_API_TOKEN: ${TODOIST_API_TOKEN}
+    volumes:
+      - app_data:/app/data
+    networks:
+      - traefik_web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_web"
+      - "traefik.http.routers.magic-mirror.rule=Host(`magic-mirror.dos.salconsultancy.nl`)"
+      - "traefik.http.routers.magic-mirror.entrypoints=websecure"
+      - "traefik.http.routers.magic-mirror.tls=true"
+      - "traefik.http.routers.magic-mirror.tls.certresolver=myresolver"
+      - "traefik.http.services.magic-mirror.loadbalancer.server.port=3000"
+
+volumes:
+  app_data:
+
+networks:
+  traefik_web:
+    external: true
