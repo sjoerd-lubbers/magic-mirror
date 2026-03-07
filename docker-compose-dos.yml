@@ -6,7 +6,7 @@ services:
     #   - "3000:3000"
     environment:
       NODE_ENV: production
-      APP_URL: ${APP_URL:-https://magic-mirror.ams8.nl}
+      APP_URL: ${APP_URL:-https://magic-mirror.dos.salconsultancy.nl}
       DATABASE_URL: ${DATABASE_URL:-file:/app/data/dev.db}
       AUTH_CODE_SECRET: ${AUTH_CODE_SECRET}
       SMTP_HOST: ${SMTP_HOST}
