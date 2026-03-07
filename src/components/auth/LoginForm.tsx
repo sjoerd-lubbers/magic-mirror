@@ -55,7 +55,7 @@ export function LoginForm() {
     const hostInfo = payload.debug?.smtpHostUsed
       ? ` (SMTP host: ${payload.debug.smtpHostUsed})`
       : "";
-    setMessage(`Code verstuurd. Check MailHog op http://localhost:8025.${hostInfo}`);
+    setMessage(`Code verstuurd. Controleer je e-mail.${hostInfo}`);
   }
 
   async function verifyCode(event: FormEvent<HTMLFormElement>) {

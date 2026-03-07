@@ -122,7 +122,7 @@ export async function POST(request: Request) {
           }
         : {
             error:
-              `Kon geen e-mail versturen. Controleer of MailHog/SMTP draait op localhost:1025 (UI: localhost:8025).${debugDetail}`,
+              `Kon geen e-mail versturen. Controleer je SMTP configuratie.${debugDetail}`,
           },
       { status: process.env.NODE_ENV === "development" ? 200 : 500 },
     );

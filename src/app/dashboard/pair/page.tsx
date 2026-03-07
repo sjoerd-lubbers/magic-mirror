@@ -1,8 +1,9 @@
 import Link from "next/link";
 import QRCode from "qrcode";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
-import { getAppUrl } from "@/lib/config";
+import { getAppUrlFromHeaders } from "@/lib/config";
 import {
   getPendingMirrorClaimSession,
   normalizeClaimToken,
@@ -309,7 +310,8 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
     createdById: user.id,
   });
 
-  const pairingUrl = `${getAppUrl()}/mirror/register?token=${pairing.token}`;
+  const appUrl = getAppUrlFromHeaders(await headers());
+  const pairingUrl = `${appUrl}/mirror/register?token=${pairing.token}`;
   const qrDataUrl = await QRCode.toDataURL(pairingUrl, {
     margin: 1,
     width: 280,

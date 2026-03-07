@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { getAppUrl } from "@/lib/config";
+import { getAppUrlFromHeaders } from "@/lib/config";
 import {
   ensurePendingMirrorClaimSession,
   getMirrorClaimSession,
@@ -9,8 +9,9 @@ import {
 
 export const runtime = "nodejs";
 
-function buildPairUrl(token: string) {
-  return `${getAppUrl()}/dashboard/pair?source=mirror&claimToken=${encodeURIComponent(token)}`;
+function buildPairUrl(token: string, request: Request) {
+  const appUrl = getAppUrlFromHeaders(request.headers);
+  return `${appUrl}/dashboard/pair?source=mirror&claimToken=${encodeURIComponent(token)}`;
 }
 
 async function buildQrDataUrl(url: string) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     | null;
   const tokenToReuse = normalizeClaimToken(body?.token ?? "");
   const session = await ensurePendingMirrorClaimSession(tokenToReuse);
-  const pairUrl = buildPairUrl(session.token);
+  const pairUrl = buildPairUrl(session.token, request);
   const qrDataUrl = await buildQrDataUrl(pairUrl);
   return NextResponse.json({
     ok: true,

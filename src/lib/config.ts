@@ -4,6 +4,34 @@ export function getAppUrl() {
   return process.env.APP_URL ?? APP_URL_FALLBACK;
 }
 
+function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
+function pickFirstHeaderValue(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const first = value.split(",")[0]?.trim();
+  return first || null;
+}
+
+export function getAppUrlFromHeaders(headerGetter: Pick<Headers, "get">) {
+  const forwardedHost = pickFirstHeaderValue(headerGetter.get("x-forwarded-host"));
+  const host = forwardedHost ?? pickFirstHeaderValue(headerGetter.get("host"));
+  const forwardedProto = pickFirstHeaderValue(headerGetter.get("x-forwarded-proto"));
+  const proto =
+    forwardedProto ??
+    (process.env.NODE_ENV === "production" ? "https" : "http");
+
+  if (!host) {
+    return normalizeBaseUrl(getAppUrl());
+  }
+
+  return `${proto}://${host}`;
+}
+
 export function getCookieSecure() {
   if (process.env.COOKIE_SECURE !== undefined) {
     return resolveBoolean(process.env.COOKIE_SECURE, false);

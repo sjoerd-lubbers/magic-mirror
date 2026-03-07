@@ -4,7 +4,7 @@ Next.js (App Router) + TypeScript basis voor een multitenant Magic Mirror platfo
 
 ## Wat zit er in de MVP
 
-- E-mail + code login (`/login`) via SMTP (MailHog in dev)
+- E-mail + code login (`/login`) via SMTP
 - Multi-tenant model op huishoudens/gezin
 - Rollen: `OWNER`, `MEMBER`, plus `PLATFORM_ADMIN` op userniveau
 - Spiegel bootflow op `/mirror`: automatisch naar registratie of gekoppelde mirror
@@ -32,7 +32,7 @@ Next.js (App Router) + TypeScript basis voor een multitenant Magic Mirror platfo
 - TypeScript
 - Prisma + SQLite
 - WebSocket via `ws`
-- Nodemailer (MailHog in development)
+- Nodemailer
 - iCloud CalDAV (agenda)
 - Todoist API (`@doist/todoist-api-typescript`)
 
@@ -70,7 +70,6 @@ npm run dev
 
 6. Open:
 - App: http://localhost:3000
-- MailHog UI: http://localhost:8025 (als je MailHog draait)
 
 ## Todoist troubleshooting
 
@@ -98,7 +97,6 @@ docker compose up --build
 
 Services:
 - App: http://localhost:3000
-- MailHog: http://localhost:8025
 
 ## Belangrijke routes
 
