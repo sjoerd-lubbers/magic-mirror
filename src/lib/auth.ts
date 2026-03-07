@@ -81,7 +81,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
   if (!session || session.expiresAt <= new Date()) {
     await prisma.session.deleteMany({ where: { token } });
-    await clearSessionCookie();
     return null;
   }
 
