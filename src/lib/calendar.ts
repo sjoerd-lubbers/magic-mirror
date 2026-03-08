@@ -1,4 +1,4 @@
-import { getICloudCalendarConfig } from "@/lib/config";
+import { getHouseholdCalendarRuntimeConfig } from "@/lib/household-integrations";
 
 export type CalendarModuleEvent = {
   id: string;
@@ -521,13 +521,15 @@ async function fetchCalendarData({
 }
 
 export async function getCalendarModuleData({
+  householdId,
   calendarName,
   daysAhead,
 }: {
+  householdId: string;
   calendarName: string;
   daysAhead: number;
 }): Promise<CalendarModuleData | null> {
-  const calendarConfig = getICloudCalendarConfig();
+  const calendarConfig = await getHouseholdCalendarRuntimeConfig(householdId);
 
   if (!calendarConfig.username || !calendarConfig.password) {
     return null;
@@ -535,6 +537,7 @@ export async function getCalendarModuleData({
 
   const normalizedDays = Math.max(1, Math.min(30, Math.trunc(daysAhead)));
   const cacheKey = [
+    householdId,
     calendarConfig.baseUrl,
     calendarConfig.username,
     calendarName.trim().toLowerCase(),

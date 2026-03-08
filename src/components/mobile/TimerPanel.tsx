@@ -155,10 +155,10 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
   }
 
   return (
-    <div className="card card-narrow stack">
+    <div className="timer-panel stack">
       <div className="stack-small">
         <h1>Timer zetten</h1>
-        <p>Snelle mobiele timerbediening.</p>
+        <p>Snelle timerbediening.</p>
       </div>
 
       <form onSubmit={submit} className="stack">

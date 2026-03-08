@@ -64,6 +64,22 @@ model Household {
   members     HouseholdMember[]
   mirrors     Mirror[]
   pairingCodes MirrorPairingCode[]
+  integrationSettings HouseholdIntegrationSettings?
+}
+
+model HouseholdIntegrationSettings {
+  id                String   @id @default(cuid())
+  householdId       String   @unique
+  iCloudCalDavUrl   String?
+  iCloudUsernameEnc String?
+  iCloudPasswordEnc String?
+  calendarCacheSeconds Int?
+  todoistApiTokenEnc String?
+  todoistProjectId  String?
+  todoistCacheSeconds Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  household         Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
 
 model HouseholdMember {

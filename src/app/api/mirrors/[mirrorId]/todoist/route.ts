@@ -12,25 +12,34 @@ type Params = {
 export async function GET(_request: Request, { params }: Params) {
   const { mirrorId } = await params;
 
-  const todoistModule = await prisma.mirrorModule.findUnique({
+  const mirror = await prisma.mirror.findUnique({
     where: {
-      mirrorId_type: {
-        mirrorId,
-        type: "TODOIST",
-      },
+      id: mirrorId,
     },
     select: {
-      enabled: true,
-      config: true,
+      householdId: true,
+      modules: {
+        where: {
+          type: "TODOIST",
+        },
+        select: {
+          enabled: true,
+          config: true,
+        },
+        take: 1,
+      },
     },
   });
 
-  if (!todoistModule?.enabled) {
+  const todoistModule = mirror?.modules[0];
+
+  if (!mirror || !todoistModule?.enabled) {
     return NextResponse.json({ ok: true, todoist: null });
   }
 
   const config = readModuleConfig("TODOIST", todoistModule.config ?? null);
   const todoist = await getTodoistModuleData({
+    householdId: mirror.householdId,
     projectId: config.projectId,
     maxVisible: config.maxVisible,
   });

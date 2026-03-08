@@ -1,4 +1,4 @@
-import { LogoutButton } from "@/components/dashboard/LogoutButton";
+import { AvatarMenu } from "@/components/dashboard/AvatarMenu";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { requireUser } from "@/lib/auth";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
@@ -18,16 +18,14 @@ export default async function DashboardLayout({
         <div>
           <p className="muted dashboard-eyebrow">Magic Mirror</p>
           <h1>{householdName}</h1>
-          <p className="muted">
-            Ingelogd als {user.displayName ?? user.email}
-          </p>
         </div>
-        <LogoutButton />
+        <AvatarMenu displayName={user.displayName} email={user.email} />
       </header>
 
-      <DashboardNav />
-
-      <section className="dashboard-content">{children}</section>
+      <div className="dashboard-main">
+        <DashboardNav />
+        <section className="dashboard-content">{children}</section>
+      </div>
     </main>
   );
 }

@@ -1,10 +1,17 @@
-import Link from "next/link";
+import { TimerPanel } from "@/components/mobile/TimerPanel";
 import { requireUser } from "@/lib/auth";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
 
-export default async function DashboardMobilePage() {
+type DashboardMobilePageProps = {
+  searchParams: Promise<{ mirrorId?: string }>;
+};
+
+export default async function DashboardMobilePage({
+  searchParams,
+}: DashboardMobilePageProps) {
   const user = await requireUser();
   const membership = await getPrimaryHouseholdForUser(user.id);
+  const params = await searchParams;
 
   if (!membership) {
     return (
@@ -14,44 +21,31 @@ export default async function DashboardMobilePage() {
     );
   }
 
-  const mirrors = membership.household.mirrors;
+  const mirrors = membership.household.mirrors.map((mirror) => ({
+    id: mirror.id,
+    name: mirror.name,
+  }));
+
+  const orderedMirrors = [...mirrors].sort((a, b) => {
+    if (a.id === params.mirrorId) {
+      return -1;
+    }
+    if (b.id === params.mirrorId) {
+      return 1;
+    }
+    return 0;
+  });
 
   return (
     <main className="stack">
-      <section className="card stack-small">
-        <h2>Mobiele bediening</h2>
-        <p className="muted">
-          Gebruik de mobiele timerpagina om snel timers te starten en lopende timers te zien.
-        </p>
-        <div className="button-row">
-          <Link href="/m" className="button-link">
-            Open mobiele timerpagina
-          </Link>
-        </div>
-      </section>
-
-      <section className="card stack-small">
-        <h2>Snelle links per spiegel</h2>
-        {mirrors.length === 0 ? (
-          <p>Nog geen spiegels gekoppeld.</p>
-        ) : (
-          <ul className="simple-list">
-            {mirrors.map((mirror) => (
-              <li key={mirror.id} className="mirror-card">
-                <div className="section-header">
-                  <div>
-                    <p>{mirror.name}</p>
-                    <p className="muted">ID: {mirror.id}</p>
-                  </div>
-                  <Link href={`/m?mirrorId=${mirror.id}`} className="button-link button-small">
-                    Open mobiel voor deze spiegel
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {mirrors.length > 0 ? (
+        <TimerPanel mirrors={orderedMirrors} />
+      ) : null}
+      {mirrors.length === 0 ? (
+        <section className="card stack-small">
+          <p className="muted">Koppel eerst een spiegel op het tabblad Spiegels.</p>
+        </section>
+      ) : null}
     </main>
   );
 }

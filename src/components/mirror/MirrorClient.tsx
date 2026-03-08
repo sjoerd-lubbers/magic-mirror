@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarModuleData } from "@/lib/calendar";
 import { MIRROR_ID_STORAGE_KEY } from "@/lib/mirror-device";
-import type { ModuleSettingsMap } from "@/lib/module-config";
+import {
+  normalizeModuleConfig,
+  type MirrorModuleType,
+  type ModuleSettingsMap,
+} from "@/lib/module-config";
 import type { TodoistModuleData } from "@/lib/todoist";
 import type { WeatherModuleData } from "@/lib/weather";
 
@@ -165,6 +169,19 @@ function formatCalendarSourceLabel(value: string) {
   return `Bron: ${value}`;
 }
 
+const MODULE_TYPES: MirrorModuleType[] = [
+  "CLOCK",
+  "WEATHER",
+  "TIMERS",
+  "CALENDAR",
+  "ATTENTION",
+  "TODOIST",
+];
+
+function isMirrorModuleType(value: unknown): value is MirrorModuleType {
+  return typeof value === "string" && MODULE_TYPES.includes(value as MirrorModuleType);
+}
+
 export function MirrorClient({
   mirrorId,
   mirrorName,
@@ -177,7 +194,9 @@ export function MirrorClient({
 }: MirrorClientProps) {
   const [now, setNow] = useState(() => new Date());
   const [timers, setTimers] = useState(initialTimers);
+  const [moduleSettings, setModuleSettings] = useState(modules);
   const [todoistData, setTodoistData] = useState(todoist);
+  const [isMonochrome, setIsMonochrome] = useState(highContrastMonochrome);
   const announcedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -203,16 +222,63 @@ export function MirrorClient({
       });
 
       socket.addEventListener("message", (event) => {
-        let payload: { type?: string; timer?: TimerView } | null = null;
+        let payload:
+          | {
+              type?: string;
+              timer?: TimerView;
+              module?: {
+                type?: string;
+                enabled?: boolean;
+                config?: unknown;
+              };
+              mirror?: {
+                highContrastMonochrome?: boolean;
+              };
+            }
+          | null = null;
 
         try {
-          payload = JSON.parse(event.data) as { type?: string; timer?: TimerView };
+          payload = JSON.parse(event.data) as {
+            type?: string;
+            timer?: TimerView;
+            module?: {
+              type?: string;
+              enabled?: boolean;
+              config?: unknown;
+            };
+            mirror?: {
+              highContrastMonochrome?: boolean;
+            };
+          };
         } catch {
           payload = null;
         }
 
         if (payload?.type === "timer_created" && payload.timer) {
           setTimers((current) => [payload.timer as TimerView, ...current]);
+        }
+
+        if (
+          payload?.type === "module_updated" &&
+          isMirrorModuleType(payload.module?.type) &&
+          typeof payload.module.enabled === "boolean"
+        ) {
+          const type = payload.module.type;
+          const normalizedConfig = normalizeModuleConfig(type, payload.module.config);
+          setModuleSettings((current) => ({
+            ...current,
+            [type]: {
+              enabled: payload.module?.enabled ?? current[type].enabled,
+              config: normalizedConfig,
+            },
+          }));
+        }
+
+        if (
+          payload?.type === "mirror_updated" &&
+          typeof payload.mirror?.highContrastMonochrome === "boolean"
+        ) {
+          setIsMonochrome(payload.mirror.highContrastMonochrome);
         }
       });
 
@@ -241,7 +307,15 @@ export function MirrorClient({
   }, [todoist]);
 
   useEffect(() => {
-    if (!modules.TODOIST.enabled) {
+    setModuleSettings(modules);
+  }, [modules]);
+
+  useEffect(() => {
+    setIsMonochrome(highContrastMonochrome);
+  }, [highContrastMonochrome]);
+
+  useEffect(() => {
+    if (!moduleSettings.TODOIST.enabled) {
       return;
     }
 
@@ -275,14 +349,14 @@ export function MirrorClient({
 
     const interval = window.setInterval(() => {
       loadTodoist().catch(() => undefined);
-    }, Math.max(10, modules.TODOIST.config.pollSeconds) * 1000);
+    }, Math.max(10, moduleSettings.TODOIST.config.pollSeconds) * 1000);
 
     return () => {
       stopped = true;
       window.clearTimeout(timeout);
       window.clearInterval(interval);
     };
-  }, [mirrorId, modules.TODOIST.enabled, modules.TODOIST.config.pollSeconds]);
+  }, [mirrorId, moduleSettings.TODOIST.enabled, moduleSettings.TODOIST.config.pollSeconds]);
 
   useEffect(() => {
     for (const timer of timers) {
@@ -321,32 +395,35 @@ export function MirrorClient({
     [timers, now],
   );
 
-  const maxVisibleTimers = modules.TIMERS.config.maxVisible;
+  const maxVisibleTimers = moduleSettings.TIMERS.config.maxVisible;
   const activeTimer = runningTimers[0] ?? null;
   const secondaryTimers = runningTimers.slice(1, maxVisibleTimers);
-  const timersDisplayMode = modules.TIMERS.config.displayMode;
+  const timersDisplayMode = moduleSettings.TIMERS.config.displayMode;
   const showTimersModule =
-    modules.TIMERS.enabled &&
+    moduleSettings.TIMERS.enabled &&
     (timersDisplayMode !== "focus" || runningTimers.length > 0);
   const timerFocusIsActive =
-    modules.TIMERS.enabled && timersDisplayMode === "focus" && Boolean(activeTimer);
+    moduleSettings.TIMERS.enabled && timersDisplayMode === "focus" && Boolean(activeTimer);
   const clockText = formatClock(now, {
-    hourFormat: modules.CLOCK.config.hourFormat,
-    showSeconds: modules.CLOCK.config.showSeconds,
+    hourFormat: moduleSettings.CLOCK.config.hourFormat,
+    showSeconds: moduleSettings.CLOCK.config.showSeconds,
   });
-  const calendarTitle = modules.CALENDAR.config.title.trim();
-  const todoistTitle = modules.TODOIST.config.title.trim();
-  const calendarFilter = modules.CALENDAR.config.calendarName.trim();
+  const calendarTitle = moduleSettings.CALENDAR.config.title.trim();
+  const todoistTitle = moduleSettings.TODOIST.config.title.trim();
+  const calendarFilter = moduleSettings.CALENDAR.config.calendarName.trim();
   const calendarSourceLabel = calendar
     ? calendarFilter
       ? formatCalendarSourceLabel(calendar.calendarName)
       : null
     : null;
+  const activeAttentionItems = moduleSettings.ATTENTION.config.items.filter(
+    (item) => item.active,
+  );
 
   if (timerFocusIsActive && activeTimer) {
     return (
       <main
-        className={`mirror-screen mirror-screen-focus${highContrastMonochrome ? " mirror-screen-monochrome" : ""}`}
+        className={`mirror-screen mirror-screen-focus${isMonochrome ? " mirror-screen-monochrome" : ""}`}
       >
         <section className="timer-focus-screen">
           <p className="timer-focus-screen-label">
@@ -369,31 +446,33 @@ export function MirrorClient({
   }
 
   return (
-    <main className={`mirror-screen${highContrastMonochrome ? " mirror-screen-monochrome" : ""}`}>
+    <main className={`mirror-screen${isMonochrome ? " mirror-screen-monochrome" : ""}`}>
       <header className="mirror-header">
         <h1>{mirrorName}</h1>
       </header>
 
       <section className="mirror-grid">
-        {modules.CLOCK.enabled ? (
+        {moduleSettings.CLOCK.enabled ? (
           <article
             className="mirror-widget widget-clock"
-            style={moduleLayoutStyle(modules.CLOCK.config.layout)}
+            style={moduleLayoutStyle(moduleSettings.CLOCK.config.layout)}
           >
-            <p className={`clock-time ${modules.CLOCK.config.size === "large" ? "clock-large" : ""}`}>
+            <p
+              className={`clock-time ${moduleSettings.CLOCK.config.size === "large" ? "clock-large" : ""}`}
+            >
               {clockText}
             </p>
           </article>
         ) : null}
 
-        {modules.WEATHER.enabled ? (
+        {moduleSettings.WEATHER.enabled ? (
           <article
-            className="mirror-widget"
-            style={moduleLayoutStyle(modules.WEATHER.config.layout)}
+            className="mirror-widget widget-weather"
+            style={moduleLayoutStyle(moduleSettings.WEATHER.config.layout)}
           >
             {weather ? (
               <>
-                {modules.WEATHER.config.showCurrent && weather.current ? (
+                {moduleSettings.WEATHER.config.showCurrent && weather.current ? (
                   <div className="weather-current">
                     <p className="weather-temp">{weather.current.temperatureC}°C</p>
                     <p>
@@ -403,15 +482,17 @@ export function MirrorClient({
                   </div>
                 ) : null}
 
-                {modules.WEATHER.config.showForecast && weather.forecast.length > 0 ? (
+                {moduleSettings.WEATHER.config.showForecast && weather.forecast.length > 0 ? (
                   <ul className="forecast-row">
-                    {weather.forecast.slice(0, modules.WEATHER.config.forecastDays).map((day) => (
-                      <li key={day.dateIso} className="forecast-item">
-                        <span className="muted">{day.dayLabel}</span>
-                        <strong className="forecast-icon">{weatherIconToEmoji(day.icon)}</strong>
-                        <span className="muted">{day.maxTempC}°</span>
-                      </li>
-                    ))}
+                    {weather.forecast
+                      .slice(0, moduleSettings.WEATHER.config.forecastDays)
+                      .map((day) => (
+                        <li key={day.dateIso} className="forecast-item">
+                          <span className="muted">{day.dayLabel}</span>
+                          <strong className="forecast-icon">{weatherIconToEmoji(day.icon)}</strong>
+                          <span className="muted">{day.maxTempC}°</span>
+                        </li>
+                      ))}
                   </ul>
                 ) : null}
               </>
@@ -421,10 +502,10 @@ export function MirrorClient({
           </article>
         ) : null}
 
-        {modules.CALENDAR.enabled ? (
+        {moduleSettings.CALENDAR.enabled ? (
           <article
             className="mirror-widget widget-calendar"
-            style={moduleLayoutStyle(modules.CALENDAR.config.layout)}
+            style={moduleLayoutStyle(moduleSettings.CALENDAR.config.layout)}
           >
             {calendar ? (
               <>
@@ -434,19 +515,21 @@ export function MirrorClient({
                 ) : null}
                 {calendar.events.length > 0 ? (
                   <ul className="calendar-list">
-                    {calendar.events.slice(0, modules.CALENDAR.config.maxVisible).map((event) => (
-                      <li key={`${event.id}:${event.startIso}`} className="calendar-row">
-                        <div>
-                          <p className="calendar-title">{event.title}</p>
-                          <p className="muted calendar-meta">
-                            {event.dayLabel} · {event.timeLabel}
-                            {modules.CALENDAR.config.showLocation && event.location
-                              ? ` (${formatShortLocation(event.location)})`
-                              : ""}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
+                    {calendar.events
+                      .slice(0, moduleSettings.CALENDAR.config.maxVisible)
+                      .map((event) => (
+                        <li key={`${event.id}:${event.startIso}`} className="calendar-row">
+                          <div>
+                            <p className="calendar-title">{event.title}</p>
+                            <p className="muted calendar-meta">
+                              {event.dayLabel} · {event.timeLabel}
+                              {moduleSettings.CALENDAR.config.showLocation && event.location
+                                ? ` (${formatShortLocation(event.location)})`
+                                : ""}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
                   </ul>
                 ) : (
                   <p className="muted">Geen afspraken in dit bereik.</p>
@@ -458,21 +541,23 @@ export function MirrorClient({
           </article>
         ) : null}
 
-        {modules.TODOIST.enabled ? (
+        {moduleSettings.TODOIST.enabled ? (
           <article
             className="mirror-widget"
-            style={moduleLayoutStyle(modules.TODOIST.config.layout)}
+            style={moduleLayoutStyle(moduleSettings.TODOIST.config.layout)}
           >
             {todoistTitle ? <p className="module-custom-title">{todoistTitle}</p> : null}
             {todoistData ? (
               todoistData.tasks.length > 0 ? (
                 <ul className="todoist-list">
-                  {todoistData.tasks.slice(0, modules.TODOIST.config.maxVisible).map((task) => (
-                    <li key={task.id} className="todoist-row">
-                      <p className="todoist-content">{task.content}</p>
-                      {task.dueLabel ? <p className="muted">{task.dueLabel}</p> : null}
-                    </li>
-                  ))}
+                  {todoistData.tasks
+                    .slice(0, moduleSettings.TODOIST.config.maxVisible)
+                    .map((task) => (
+                      <li key={task.id} className="todoist-row">
+                        <p className="todoist-content">{task.content}</p>
+                        {task.dueLabel ? <p className="muted">{task.dueLabel}</p> : null}
+                      </li>
+                    ))}
                 </ul>
               ) : (
                 <p className="muted">Geen open Todoist taken.</p>
@@ -486,7 +571,7 @@ export function MirrorClient({
         {showTimersModule ? (
           <article
             className="mirror-widget"
-            style={moduleLayoutStyle(modules.TIMERS.config.layout)}
+            style={moduleLayoutStyle(moduleSettings.TIMERS.config.layout)}
           >
             {runningTimers.length === 0 ? (
               <p className="muted">Geen actieve timers</p>
@@ -503,16 +588,16 @@ export function MirrorClient({
           </article>
         ) : null}
 
-        {modules.ATTENTION.enabled ? (
+        {moduleSettings.ATTENTION.enabled ? (
           <article
             className="mirror-widget"
-            style={moduleLayoutStyle(modules.ATTENTION.config.layout)}
+            style={moduleLayoutStyle(moduleSettings.ATTENTION.config.layout)}
           >
-            {modules.ATTENTION.config.items.length === 0 ? (
-              <p className="muted">Nog geen aandachtspunten ingesteld.</p>
+            {activeAttentionItems.length === 0 ? (
+              <p className="muted">Geen actieve aandachtspunten.</p>
             ) : (
               <ul className="attention-list">
-                {modules.ATTENTION.config.items.map((item) => {
+                {activeAttentionItems.map((item) => {
                   const counter = formatAttentionCounter({
                     targetDate: item.targetDate,
                     now,

@@ -2,16 +2,31 @@ import type { IncomingMessage } from "http";
 import type { Socket } from "net";
 import { WebSocketServer, type WebSocket } from "ws";
 
-type MirrorEvent = {
-  type: "timer_created";
-  timer: {
-    id: string;
-    label: string | null;
-    durationSeconds: number;
-    endsAt: string;
-    greetingName: string | null;
-  };
-};
+type MirrorEvent =
+  | {
+      type: "timer_created";
+      timer: {
+        id: string;
+        label: string | null;
+        durationSeconds: number;
+        endsAt: string;
+        greetingName: string | null;
+      };
+    }
+  | {
+      type: "module_updated";
+      module: {
+        type: string;
+        enabled: boolean;
+        config: unknown;
+      };
+    }
+  | {
+      type: "mirror_updated";
+      mirror: {
+        highContrastMonochrome: boolean;
+      };
+    };
 
 type ConnectedClient = {
   id: string;
@@ -134,7 +149,8 @@ export function broadcastToMirror(mirrorId: string, event: MirrorEvent) {
     }
   }
 
-  console.info("WS broadcast timer_created", {
+  console.info("WS broadcast event", {
+    eventType: event.type,
     mirrorId,
     delivered,
     connectedClients: state.clients.size,

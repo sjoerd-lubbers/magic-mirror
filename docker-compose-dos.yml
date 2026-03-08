@@ -9,6 +9,7 @@ services:
       APP_URL: ${APP_URL:-https://magic-mirror.dos.salconsultancy.nl}
       DATABASE_URL: file:/app/data/dev.db
       AUTH_CODE_SECRET: ${AUTH_CODE_SECRET}
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}

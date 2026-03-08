@@ -1,4 +1,4 @@
-import { getTodoistConfig } from "@/lib/config";
+import { getHouseholdTodoistRuntimeConfig } from "@/lib/household-integrations";
 import {
   TodoistApi,
   TodoistRequestError,
@@ -136,13 +136,15 @@ function shouldRetryWithoutProjectFilter(error: TodoistRequestError) {
 }
 
 export async function getTodoistModuleData({
+  householdId,
   projectId: projectIdOverride,
   maxVisible,
 }: {
+  householdId: string;
   projectId: string;
   maxVisible: number;
 }): Promise<TodoistModuleData | null> {
-  const todoist = getTodoistConfig();
+  const todoist = await getHouseholdTodoistRuntimeConfig(householdId);
   const apiToken = todoist.apiToken.trim();
   const projectId = (projectIdOverride || todoist.projectId || "").trim();
 
@@ -150,7 +152,7 @@ export async function getTodoistModuleData({
     return null;
   }
 
-  const cacheKey = `${apiToken}:${projectId || "all"}:${maxVisible}`;
+  const cacheKey = `${householdId}:${apiToken}:${projectId || "all"}:${maxVisible}`;
   const cached = todoistCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {

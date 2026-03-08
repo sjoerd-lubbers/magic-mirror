@@ -46,6 +46,7 @@ export type AttentionCounterItem = {
   id: string;
   label: string;
   targetDate: string;
+  active: boolean;
 };
 
 export type AttentionModuleConfig = {
@@ -399,6 +400,7 @@ function normalizeAttentionConfig(value: unknown): AttentionModuleConfig {
       id,
       label,
       targetDate: targetDateCandidate,
+      active: typeof rawItem.active === "boolean" ? rawItem.active : true,
     });
   }
 

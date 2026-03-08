@@ -9,11 +9,23 @@ export default async function DashboardSystemPage() {
       <section className="card stack-small">
         <h2>Systeem</h2>
         <p className="muted">
-          Operationele acties voor device-koppeling en spiegelweergave.
+          Deze tab is vooral voor technische checks. Dagelijks beheer doe je via Spiegels, Gezin en
+          Koppelingen.
         </p>
+        <ul className="simple-list">
+          <li>
+            Nieuwe schermen koppelen: ga naar <strong>Spiegels</strong> en gebruik de plusknop.
+          </li>
+          <li>
+            Timers zetten: ga naar <strong>Timers</strong>.
+          </li>
+          <li>
+            Integraties en API keys: ga naar <strong>Koppelingen</strong>.
+          </li>
+        </ul>
         <div className="button-row">
-          <Link href="/dashboard/pair" className="button-link button-small">
-            Nieuwe koppel-QR starten
+          <Link href="/dashboard/mirrors" className="button-link button-small">
+            Naar Spiegelbeheer
           </Link>
           <Link href="/mirror" className="button-link button-secondary button-small">
             Mirror bootflow testen

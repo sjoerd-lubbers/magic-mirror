@@ -8,6 +8,7 @@ import {
   type MirrorModuleType,
 } from "@/lib/module-config";
 import { prisma } from "@/lib/prisma";
+import { broadcastToMirror } from "@/lib/ws-hub";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,15 @@ export async function POST(request: Request, { params }: Params) {
     update: {
       enabled: nextEnabled,
       config: JSON.stringify(normalizedConfig),
+    },
+  });
+
+  broadcastToMirror(mirrorId, {
+    type: "module_updated",
+    module: {
+      type,
+      enabled: moduleState.enabled,
+      config: normalizedConfig,
     },
   });
 

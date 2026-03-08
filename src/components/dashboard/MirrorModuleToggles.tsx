@@ -59,6 +59,7 @@ function createAttentionItem(): AttentionCounterItem {
     id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     label: "",
     targetDate: todayIso(),
+    active: true,
   };
 }
 
@@ -670,9 +671,17 @@ function AttentionSettings({
                 />
               </label>
 
-              <label>
-                Info
-                <span className="muted">Automatisch: dagen tot/geleden</span>
+              <label className="inline-checkbox">
+                <input
+                  type="checkbox"
+                  checked={item.active}
+                  onChange={(event) =>
+                    updateItem(item.id, {
+                      active: event.target.checked,
+                    })
+                  }
+                />
+                <span>Actief</span>
               </label>
 
               <button

@@ -57,6 +57,7 @@ export default async function MirrorPage({ params }: MirrorPageProps) {
 
   const calendar = modules.CALENDAR.enabled
     ? await getCalendarModuleData({
+        householdId: mirror.householdId,
         calendarName: modules.CALENDAR.config.calendarName,
         daysAhead: modules.CALENDAR.config.daysAhead,
       })
@@ -64,6 +65,7 @@ export default async function MirrorPage({ params }: MirrorPageProps) {
 
   const todoist = modules.TODOIST.enabled
     ? await getTodoistModuleData({
+        householdId: mirror.householdId,
         projectId: modules.TODOIST.config.projectId,
         maxVisible: modules.TODOIST.config.maxVisible,
       })

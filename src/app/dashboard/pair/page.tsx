@@ -18,6 +18,8 @@ type PairMirrorPageProps = {
   searchParams: Promise<{
     source?: string;
     claimToken?: string;
+    targetMirrorId?: string;
+    autoLink?: string;
     done?: string;
     mirrorId?: string;
     error?: string;
@@ -196,12 +198,33 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
 
   const fromMirror = params.source === "mirror";
   const claimToken = normalizeClaimToken(params.claimToken);
+  const targetMirrorId = params.targetMirrorId?.trim() ?? "";
+  const autoLinkToTarget = params.autoLink === "1";
   const error = claimErrorMessage(params.error);
 
   if (claimToken) {
     const done = params.done === "1";
     const pendingClaim = done ? null : await getPendingMirrorClaimSession(claimToken);
     const linkedMirrorId = params.mirrorId?.trim() || null;
+    const targetMirror = targetMirrorId
+      ? membership.household.mirrors.find((mirror) => mirror.id === targetMirrorId) ?? null
+      : null;
+    const defaultExistingMirrorId = targetMirror?.id ?? membership.household.mirrors[0]?.id;
+
+    if (!done && autoLinkToTarget && pendingClaim && targetMirror) {
+      const claimResult = await claimMirrorSession({
+        token: claimToken,
+        mirrorId: targetMirror.id,
+      });
+
+      if (!claimResult) {
+        redirect(`/dashboard/pair?claimToken=${encodeURIComponent(claimToken)}&error=claim_race`);
+      }
+
+      redirect(
+        `/dashboard/pair?claimToken=${encodeURIComponent(claimToken)}&done=1&mirrorId=${encodeURIComponent(targetMirror.id)}`,
+      );
+    }
 
     return (
       <main className="page-wrap stack">
@@ -226,6 +249,11 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
 
           {!done && pendingClaim ? (
             <>
+              {targetMirror ? (
+                <p className="notice success">
+                  Doelspiegel gekozen: <strong>{targetMirror.name}</strong>
+                </p>
+              ) : null}
               <p>
                 {fromMirror
                   ? "Scan kwam van de spiegel. Rond hieronder de registratie af."
@@ -239,7 +267,7 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
                     Koppel aan bestaande spiegel
                     <select
                       name="existingMirrorId"
-                      defaultValue={membership.household.mirrors[0]?.id}
+                      defaultValue={defaultExistingMirrorId}
                     >
                       {membership.household.mirrors.map((mirror) => (
                         <option key={mirror.id} value={mirror.id}>
