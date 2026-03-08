@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readModuleConfig } from "@/lib/module-config";
 import { prisma } from "@/lib/prisma";
 import { getTodoistModuleData } from "@/lib/todoist";
+import { getMirrorSubscriberCount } from "@/lib/ws-hub";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,15 @@ type Params = {
 
 export async function GET(_request: Request, { params }: Params) {
   const { mirrorId } = await params;
+  const subscriberCount = getMirrorSubscriberCount(mirrorId);
+
+  if (subscriberCount === 0) {
+    return NextResponse.json({
+      ok: true,
+      todoist: null,
+      skipped: "mirror_offline",
+    });
+  }
 
   const mirror = await prisma.mirror.findUnique({
     where: {

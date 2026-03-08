@@ -87,6 +87,13 @@ function formatClockDate(now: Date) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+function formatCurrentTemperature(temperatureC: number, decimals: 0 | 1) {
+  return new Intl.NumberFormat("nl-NL", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(temperatureC);
+}
+
 function weatherIconToEmoji(icon: string) {
   const prefix = icon.slice(0, 2);
 
@@ -216,6 +223,7 @@ export function MirrorClient({
   const [isMonochrome, setIsMonochrome] = useState(highContrastMonochrome);
   const [showGrid, setShowGrid] = useState(showAlignmentGrid);
   const [gridRowCount, setGridRowCount] = useState(normalizeGridRows(gridRows));
+  const [hasWsSubscription, setHasWsSubscription] = useState(false);
   const announcedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -237,6 +245,7 @@ export function MirrorClient({
       socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
 
       socket.addEventListener("open", () => {
+        setHasWsSubscription(false);
         socket?.send(JSON.stringify({ type: "subscribe", mirrorId }));
       });
 
@@ -255,6 +264,7 @@ export function MirrorClient({
                 showAlignmentGrid?: boolean;
                 gridRows?: number;
               };
+              mirrorId?: string;
             }
           | null = null;
 
@@ -272,9 +282,14 @@ export function MirrorClient({
               showAlignmentGrid?: boolean;
               gridRows?: number;
             };
+            mirrorId?: string;
           };
         } catch {
           payload = null;
+        }
+
+        if (payload?.type === "subscribed" && payload.mirrorId === mirrorId) {
+          setHasWsSubscription(true);
         }
 
         if (payload?.type === "timer_created" && payload.timer) {
@@ -322,6 +337,8 @@ export function MirrorClient({
       });
 
       socket.addEventListener("close", () => {
+        setHasWsSubscription(false);
+
         if (closedByCleanup) {
           return;
         }
@@ -337,6 +354,7 @@ export function MirrorClient({
       if (reconnectTimeout) {
         window.clearTimeout(reconnectTimeout);
       }
+      setHasWsSubscription(false);
       socket?.close();
     };
   }, [gridRowCount, mirrorId]);
@@ -362,7 +380,7 @@ export function MirrorClient({
   }, [gridRows]);
 
   useEffect(() => {
-    if (!moduleSettings.TODOIST.enabled) {
+    if (!moduleSettings.TODOIST.enabled || !hasWsSubscription) {
       return;
     }
 
@@ -403,7 +421,12 @@ export function MirrorClient({
       window.clearTimeout(timeout);
       window.clearInterval(interval);
     };
-  }, [mirrorId, moduleSettings.TODOIST.enabled, moduleSettings.TODOIST.config.pollSeconds]);
+  }, [
+    mirrorId,
+    moduleSettings.TODOIST.enabled,
+    moduleSettings.TODOIST.config.pollSeconds,
+    hasWsSubscription,
+  ]);
 
   useEffect(() => {
     for (const timer of timers) {
@@ -585,7 +608,12 @@ export function MirrorClient({
                         {weatherIconToEmoji(weather.current.icon)}
                       </strong>
                       <p className="weather-temp">
-                        <span className="weather-temp-value">{weather.current.temperatureC}</span>
+                        <span className="weather-temp-value">
+                          {formatCurrentTemperature(
+                            weather.current.temperatureC,
+                            moduleSettings.WEATHER.config.currentTempDecimals,
+                          )}
+                        </span>
                         <span className="weather-temp-unit">°C</span>
                       </p>
                     </div>

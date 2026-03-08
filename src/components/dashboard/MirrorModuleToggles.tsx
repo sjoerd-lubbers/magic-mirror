@@ -500,6 +500,23 @@ function WeatherSettings({
         </select>
       </label>
 
+      <label>
+        Huidige temperatuur decimalen
+        <select
+          value={String(config.currentTempDecimals)}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            onChange({
+              ...config,
+              currentTempDecimals: value === 1 ? 1 : 0,
+            });
+          }}
+        >
+          <option value="0">0 decimalen</option>
+          <option value="1">1 decimaal</option>
+        </select>
+      </label>
+
       <LayoutEditor
         layout={config.layout}
         gridRows={gridRows}

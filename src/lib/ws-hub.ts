@@ -158,3 +158,24 @@ export function broadcastToMirror(mirrorId: string, event: MirrorEvent) {
     connectedClients: state.clients.size,
   });
 }
+
+export function getMirrorSubscriberCount(mirrorId: string) {
+  const state = getHubState();
+  let count = 0;
+
+  for (const client of state.clients) {
+    if (client.mirrorId !== mirrorId) {
+      continue;
+    }
+
+    if (client.socket.readyState === client.socket.OPEN) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+export function hasMirrorSubscribers(mirrorId: string) {
+  return getMirrorSubscriberCount(mirrorId) > 0;
+}

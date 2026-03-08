@@ -161,7 +161,7 @@ export async function getWeatherModuleData({
 
   const current: WeatherCurrent | null = currentJson
     ? {
-        temperatureC: Math.round(currentJson.main?.temp ?? 0),
+        temperatureC: Number((currentJson.main?.temp ?? 0).toFixed(1)),
         description: currentJson.weather?.[0]?.description ?? "onbekend",
         icon: currentJson.weather?.[0]?.icon ?? "01d",
         city: currentJson.name ?? "Onbekend",

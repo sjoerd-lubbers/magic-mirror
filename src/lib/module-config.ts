@@ -30,6 +30,7 @@ export type WeatherModuleConfig = {
   showCurrent: boolean;
   showForecast: boolean;
   forecastDays: 3 | 5 | 7;
+  currentTempDecimals: 0 | 1;
   layout: ModuleLayout;
 };
 
@@ -155,6 +156,7 @@ function defaultWeatherConfig(): WeatherModuleConfig {
     showCurrent: true,
     showForecast: true,
     forecastDays: 5,
+    currentTempDecimals: 0,
     layout: defaultLayout("WEATHER"),
   };
 }
@@ -321,6 +323,11 @@ function normalizeWeatherConfig(
   const requestedDays = toInt(value.forecastDays, fallback.forecastDays);
   const forecastDays: 3 | 5 | 7 =
     requestedDays === 3 || requestedDays === 7 ? requestedDays : 5;
+  const requestedDecimals = toInt(
+    value.currentTempDecimals,
+    fallback.currentTempDecimals,
+  );
+  const currentTempDecimals: 0 | 1 = requestedDecimals === 1 ? 1 : 0;
 
   return {
     showCurrent:
@@ -332,6 +339,7 @@ function normalizeWeatherConfig(
         ? value.showForecast
         : fallback.showForecast,
     forecastDays,
+    currentTempDecimals,
     layout: normalizeLayout("WEATHER", value.layout, options),
   };
 }

@@ -1,118 +1,230 @@
 # Magic Mirror 26
 
-Next.js (App Router) + TypeScript basis voor een multitenant Magic Mirror platform.
+Next.js (App Router) + TypeScript webapp voor een multitenant Magic Mirror platform.
 
-## Wat zit er in de MVP
+## Huidige status
 
-- E-mail + code login (`/login`) via SMTP
-- Multi-tenant model op huishoudens/gezin
-- Rollen: `OWNER`, `MEMBER`, plus `PLATFORM_ADMIN` op userniveau
-- Spiegel bootflow op `/mirror`: automatisch naar registratie of gekoppelde mirror
-- Spiegel koppelen via telefoonflow: QR op spiegel, registratie op telefoon, spiegel schakelt vanzelf door
-- Spiegelmodules configureerbaar vanuit dashboard:
-  - Klok: 12/24 uur, seconden aan/uit, grootte
-  - Weer: huidig weer + meerdaagse forecast (3/5/7 dagen)
-  - Timers: max zichtbare timers + weergave modus (`focus` = alleen timer fullscreen)
-  - Agenda: iCloud CalDAV (kalenderfilter, dagen vooruit, max zichtbaar, locatie aan/uit)
-  - Aandacht: eigen lijst met tellers (dagen sinds/tot)
-  - Todoist: open taken uit project (project id, max zichtbaar, poll interval)
-  - Layout: positie (`x`,`y`) en afmeting (`w`,`h`) per module
-- Light mobiele webapp voor timers (`/m`)
-  - Preset knoppen (3, 6, 10, 15, 20, 25, 30, 40, 50, 60 min)
-  - Lopende timers live zichtbaar
-- Mirror view (`/mirror/[mirrorId]`) met browser TTS bij timer voltooiing
-- Realtime timer updates via WebSocket (`/ws`)
-- Weercache: huidig weer 15 minuten, forecast 24 uur
-- Agendacache: iCloud snapshot standaard 300 seconden
-- Prisma schema + migratiebasis met SQLite
+Het product is functioneel als eerste release:
+
+- Inloggen met e-mail + 6-cijferige code via SMTP
+- Multi-tenant op huishoudens (gezin) met rollen `OWNER`/`MEMBER`
+- Spiegel koppelen via QR claim-flow (telefoon scant QR op scherm)
+- Realtime updates via WebSocket (`/ws`) voor:
+  - nieuwe timers
+  - modulewijzigingen
+  - spiegelinstellingen (contrast, raster, raster-rijen)
+- 1 dashboard app voor mobiel en desktop (responsive navigatie)
+- Prisma migraties + SQLite
+
+## Functionaliteit
+
+### Dashboard
+
+- `Spiegels`: overzicht in tegels, beheren per spiegel, scherm koppelen via QR scan
+- `Timers`: mobiele timerbediening met presets + live lopende timers
+- `Gezin`: gezinsnaam beheren, leden toevoegen/wijzigen/verwijderen
+- `Integraties`: globale (`.env`) en gezinsspecifieke koppelingen
+- Avatar-menu: profiel, uitloggen
+
+### Spiegelmodules
+
+- `Klok`
+  - 12/24 uur
+  - seconden aan/uit
+  - datum boven tijd aan/uit
+  - schaalbaar lettertype
+- `Weer`
+  - actuele temperatuur + groot icoon
+  - forecast (3/5/7 dagen)
+- `Timers`
+  - `focus` (fullscreen bij actieve timer) of `list`
+  - meerdere timers tegelijk zichtbaar
+- `Agenda` (iCloud CalDAV)
+  - titel optioneel
+  - kalenderfilter
+  - dagen vooruit, max zichtbaar, locatie aan/uit
+- `Aandacht`
+  - vrije items met doeldatum
+  - automatisch "dagen tot/geleden"
+  - `active` vlag per item
+- `Todoist`
+  - open taken uit project (of zonder projectfilter)
+  - titel optioneel
+  - max zichtbaar
+  - poll-interval
+
+### Spiegelweergave
+
+- `high contrast` monochroom modus
+- uitlijnraster aan/uit
+- raster-rijen schakelbaar (12..24)
+- timer melding via browser TTS (`nl-NL`)
+
+## Belangrijke routes
+
+- `/login` inloggen
+- `/dashboard` redirect naar `/dashboard/mirrors`
+- `/dashboard/mirrors` spiegeloverzicht
+- `/dashboard/mirrors/[mirrorId]` spiegel beheren
+- `/dashboard/mobile` timerbediening
+- `/dashboard/family` gezinsbeheer
+- `/dashboard/integrations` integratie-overzicht
+- `/dashboard/integrations/[integrationId]` integratie details
+- `/dashboard/pair/scan` QR scanner op telefoon
+- `/dashboard/pair` afronden van claim-flow
+- `/mirror` kiosk entry:
+  - met `localStorage mm_mirror_id` -> `/mirror/[mirrorId]`
+  - zonder id -> `/mirror/register`
+- `/mirror/register` QR tonen en wachten op claim
+- `/mirror/[mirrorId]` spiegelweergave
+- `/m` compacte timerpagina
+
+## Refresh en cache gedrag
+
+Er draait geen achtergrond-cron. Data wordt alleen opgehaald als er requests zijn.
+
+- Weer:
+  - huidig weer: `revalidate 900s` (15 min)
+  - forecast: `revalidate 86400s` (24 uur)
+- iCloud agenda:
+  - server-memory cache per huishouden/config
+  - TTL: `CALENDAR_CACHE_SECONDS` (min 30, standaard 300)
+- Todoist:
+  - server-memory cache per huishouden/config
+  - TTL: `TODOIST_CACHE_SECONDS` (min 15, vaak 60..3600)
+  - mirror client pollt `/api/mirrors/[mirrorId]/todoist` met module `pollSeconds` (10..3600)
+  - polling draait alleen na actieve WS subscribe van die spiegel
+
+Opmerking:
+- Weather en agenda worden als snapshot bij page render opgehaald.
+- Todoist wordt tijdens runtime actief gepolld.
+
+## Integratiestrategie
+
+- Globaal via `.env`:
+  - SMTP
+  - OpenWeather API key
+  - fallback voor iCloud/Todoist
+- Gezinsspecifiek (aanbevolen):
+  - iCloud credentials + cache
+  - Todoist token/project + cache
+  - opgeslagen in DB, secrets encrypted (`INTEGRATIONS_ENCRYPTION_KEY`)
+
+Je kunt integraties kopieren via klembord:
+
+- Export: knop `Kopieer integraties`
+- Import: plak JSON op de integratiespagina
+
+Per spiegel kun je ook module/layout instellingen kopieren/importeren:
+
+- Export: knop `Kopieer settings`
+- Import: plak JSON op de spiegelbeheer pagina
 
 ## Tech stack
 
 - Next.js 16 (App Router)
-- TypeScript
-- Prisma + SQLite
-- WebSocket via `ws`
-- Nodemailer
-- iCloud CalDAV (agenda)
-- Todoist API (`@doist/todoist-api-typescript`)
+- React 19 + TypeScript
+- Prisma 6 + SQLite
+- `ws` WebSocket server (custom `server.ts`)
+- Nodemailer (SMTP)
+- iCloud CalDAV
+- Todoist API v1 (`@doist/todoist-api-typescript`)
 
-## Snel starten (lokaal)
+## Lokaal starten
 
-1. Dependencies installeren:
+1. Installeer dependencies:
 
 ```bash
 npm install
 ```
 
-2. Environment aanmaken:
+2. Maak `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Prisma client genereren:
+3. Genereer Prisma client:
 
 ```bash
 npm run prisma:generate
 ```
 
-4. Migraties draaien:
+4. Draai migraties:
 
 ```bash
-npm run prisma:migrate -- --name init
+npm run prisma:migrate
 ```
 
-5. App starten:
+5. Start in development:
 
 ```bash
 npm run dev
 ```
 
 6. Open:
-- App: http://localhost:3000
 
-## Todoist troubleshooting
+- http://localhost:3000
 
-- Zet minimaal `TODOIST_API_TOKEN` in `.env`.
-- Voor projectfilter werkt `TODOIST_PROJECT_ID` (en ook de compatibele alias `TODOIST_RECIPES_PROJECT_ID`).
-- Krijg je `V1_ID_CANNOT_BE_USED` (error 557), dan is je project-id verouderd voor API v1.
-- Tijdelijke fallback: de app toont dan open taken zonder projectfilter.
+## Productie (Docker)
 
-## SMTP op hosting
-
-- Stel minimaal `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` in.
-- Voor externe providers: zet `SMTP_IGNORE_TLS=false`.
-- Gebruik `SMTP_SECURE=true` voor implicit TLS (meestal poort 465), anders `false` voor STARTTLS (meestal 587).
-
-## Cookies op hosting
-
-- Draai je zonder HTTPS (alleen `http://`), zet dan `COOKIE_SECURE=false` in `.env`.
-- Met HTTPS kun je `COOKIE_SECURE=true` gebruiken.
-
-## Docker (eigen server)
+`Dockerfile` bouwt de app en start met:
 
 ```bash
-docker compose up --build
+npx prisma migrate deploy && npm run start
 ```
 
-Services:
-- App: http://localhost:3000
+Daarmee worden migraties automatisch toegepast bij container start.
 
-## Belangrijke routes
+### Standaard compose
 
-- `/login`: inloggen met e-mail + code
-- `/dashboard`: gezins- en spiegelbeheer
-- `/dashboard/pair`: telefoon-pair pagina (claim-flow + legacy fallback)
-- `/mirror`: kiosk-entry (redirect naar `/mirror/register` of `/mirror/[mirrorId]`)
-- `/mirror/register`: spiegel-koppelpunt met QR en automatische activatie
-- `/mirror/[mirrorId]`: spiegelweergave
-- `/m`: lichte mobiele timerpagina
+```bash
+docker compose up --build -d
+```
 
-## Prisma modeloverzicht
+- poort `3000`
+- lokale volume mount `./data:/app/data`
+
+### Portainer / eigen server (`docker-compose-dos.yml`)
+
+- gebruikt named volume `app_data` voor persistente SQLite data
+- zet minimaal deze env vars in je stack:
+  - `APP_URL`
+  - `AUTH_CODE_SECRET`
+  - `INTEGRATIONS_ENCRYPTION_KEY`
+  - SMTP vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, optioneel auth/tls)
+  - `OPENWEATHER_API_KEY`
+
+## Environment variabelen
+
+Zie `.env.example`. Belangrijk:
+
+- `DATABASE_URL` (default lokaal: `file:./dev.db`)
+- `APP_URL` (basis URL voor links/QR fallback)
+- `AUTH_CODE_SECRET`
+- `INTEGRATIONS_ENCRYPTION_KEY`
+- `COOKIE_SECURE` (`false` op HTTP, `true` op HTTPS)
+- SMTP:
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_SECURE`
+  - `SMTP_IGNORE_TLS`
+  - `SMTP_TLS_REJECT_UNAUTHORIZED`
+  - `SMTP_USER`
+  - `SMTP_PASS`
+  - `SMTP_FROM`
+- Integratie defaults/fallback:
+  - `OPENWEATHER_API_KEY`
+  - `ICLOUD_CALDAV_URL`, `ICLOUD_CALDAV_USERNAME`, `ICLOUD_CALDAV_PASSWORD`
+  - `CALENDAR_CACHE_SECONDS`
+  - `TODOIST_API_TOKEN`, `TODOIST_PROJECT_ID`, `TODOIST_CACHE_SECONDS`
+
+## Prisma modellen
 
 - `User`
 - `Household`
 - `HouseholdMember`
+- `HouseholdIntegrationSettings`
 - `Mirror`
 - `MirrorModule`
 - `Timer`
@@ -121,17 +233,27 @@ Services:
 - `VerificationCode`
 - `Session`
 
-## Bekende MVP-beperkingen
+## Troubleshooting
 
-- Geen hardening voor publieke mirror URLs (geen device secret token nog)
-- Nog geen uitnodigingsflow voor extra gezinsleden
-- Timer completion wordt client-side afgehandeld op de mirror (TTS)
-- Platform admin UI nog niet uitgewerkt
+### Todoist `V1_ID_CANNOT_BE_USED` / 400
 
-## Volgende logische stap
+Project ID is verouderd voor API v1. Gebruik een nieuwe v1 project id.
+De app probeert fallback zonder projectfilter zodat taken zichtbaar blijven.
 
-1. Invite-flow voor gezinsleden (e-mail invite + roltoekenning)
-2. Mirror device auth token toevoegen
-3. Timer status terugschrijven (`COMPLETED`) + historie
-4. Admin paneel voor tenant beheer
-5. Migratiepad naar Postgres voorbereiden
+### Todoist 410 op oude endpoints
+
+Gebruik API v1 flows (de app gebruikt `@doist/todoist-api-typescript`).
+Deprecated endpoints geven 410.
+
+### Login mail komt niet aan
+
+Controleer SMTP host/poort/tls instellingen.
+In development geeft de app debug info terug bij SMTP fouten.
+
+### Spiegel blijft op register/claim hangen
+
+Controleer:
+
+- `APP_URL` klopt op productie domein
+- mirror kan `/ws` bereiken
+- database persistent is (volume op `/app/data`)
