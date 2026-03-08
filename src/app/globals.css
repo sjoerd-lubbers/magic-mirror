@@ -48,17 +48,24 @@ label {
 
 input,
 select,
+textarea,
 button {
   font: inherit;
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid var(--border);
   background: rgba(5, 17, 21, 0.7);
   color: var(--text);
   border-radius: 0.6rem;
   padding: 0.6rem 0.75rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 7rem;
 }
 
 button,
@@ -111,6 +118,19 @@ button:disabled {
   padding: 1.5rem;
 }
 
+.dashboard-shell {
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  padding: 1.25rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.dashboard-content {
+  display: grid;
+  gap: 1rem;
+}
+
 .stack {
   display: grid;
   gap: 1rem;
@@ -151,6 +171,70 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.dashboard-header-shell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-eyebrow {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.dashboard-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: rgba(8, 22, 27, 0.45);
+  padding: 0.45rem;
+}
+
+.dashboard-nav-link {
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.58rem;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+
+.dashboard-nav-link:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.dashboard-nav-link.active {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+}
+
+.status-chip.ok {
+  color: #b9ffd0;
+  border-color: rgba(120, 217, 158, 0.6);
+  background: rgba(120, 217, 158, 0.16);
+}
+
+.status-chip.warn {
+  color: #ffd2d2;
+  border-color: rgba(255, 123, 123, 0.6);
+  background: rgba(255, 123, 123, 0.12);
+}
+
 .simple-list,
 .timer-list {
   list-style: none;
@@ -184,6 +268,39 @@ button:disabled {
   padding: 0.8rem;
   display: grid;
   gap: 0.75rem;
+}
+
+.mirror-card-header {
+  align-items: flex-start;
+}
+
+.mirror-card-primary-actions {
+  justify-content: flex-end;
+}
+
+.details-panel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.7rem;
+  background: rgba(4, 16, 20, 0.45);
+}
+
+.details-summary {
+  cursor: pointer;
+  padding: 0.55rem 0.7rem;
+  font-weight: 600;
+}
+
+.details-body {
+  padding: 0.1rem 0.7rem 0.7rem;
+}
+
+.inline-copy-wrap {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.inline-copy-status {
+  font-size: 0.85rem;
 }
 
 .module-config-list {
@@ -313,6 +430,10 @@ button:disabled {
   align-content: center;
   justify-items: center;
   padding: 0;
+}
+
+.mirror-screen.mirror-screen-monochrome {
+  filter: grayscale(1) contrast(1.35) brightness(1.08);
 }
 
 .mirror-header h1 {
@@ -554,11 +675,19 @@ button:disabled {
     align-items: flex-start;
   }
 
+  .dashboard-header-shell {
+    align-items: flex-start;
+  }
+
   .layout-grid {
     grid-template-columns: 1fr;
   }
 
   .preset-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mirror-card-primary-actions {
+    justify-content: flex-start;
   }
 }

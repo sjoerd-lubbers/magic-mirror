@@ -83,6 +83,7 @@ model Mirror {
   householdId  String
   name         String
   status       MirrorStatus  @default(UNKNOWN)
+  highContrastMonochrome Boolean @default(false)
   locationName String?
   latitude     Float?
   longitude    Float?

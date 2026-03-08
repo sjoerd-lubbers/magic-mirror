@@ -73,6 +73,7 @@ export default async function MirrorPage({ params }: MirrorPageProps) {
     <MirrorClient
       mirrorId={mirror.id}
       mirrorName={mirror.name}
+      highContrastMonochrome={mirror.highContrastMonochrome}
       modules={modules}
       weather={weather}
       calendar={calendar}

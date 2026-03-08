@@ -207,7 +207,7 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
       <main className="page-wrap stack">
         <header className="section-header">
           <h1>Spiegel koppelen</h1>
-          <Link href="/dashboard" className="button-link button-small">
+          <Link href="/dashboard/mirrors" className="button-link button-small">
             Terug
           </Link>
         </header>
@@ -321,7 +321,7 @@ export default async function PairMirrorPage({ searchParams }: PairMirrorPagePro
     <main className="page-wrap stack">
       <header className="section-header">
         <h1>Spiegel koppelen</h1>
-        <Link href="/dashboard" className="button-link button-small">
+        <Link href="/dashboard/mirrors" className="button-link button-small">
           Terug
         </Link>
       </header>

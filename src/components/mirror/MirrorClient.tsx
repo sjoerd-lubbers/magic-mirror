@@ -18,6 +18,7 @@ type TimerView = {
 type MirrorClientProps = {
   mirrorId: string;
   mirrorName: string;
+  highContrastMonochrome: boolean;
   modules: ModuleSettingsMap;
   weather: WeatherModuleData | null;
   calendar: CalendarModuleData | null;
@@ -167,6 +168,7 @@ function formatCalendarSourceLabel(value: string) {
 export function MirrorClient({
   mirrorId,
   mirrorName,
+  highContrastMonochrome,
   modules,
   weather,
   calendar,
@@ -343,7 +345,9 @@ export function MirrorClient({
 
   if (timerFocusIsActive && activeTimer) {
     return (
-      <main className="mirror-screen mirror-screen-focus">
+      <main
+        className={`mirror-screen mirror-screen-focus${highContrastMonochrome ? " mirror-screen-monochrome" : ""}`}
+      >
         <section className="timer-focus-screen">
           <p className="timer-focus-screen-label">
             {activeTimer.label ?? `Timer ${formatTimerLabel(activeTimer.durationSeconds)}`}
@@ -365,7 +369,7 @@ export function MirrorClient({
   }
 
   return (
-    <main className="mirror-screen">
+    <main className={`mirror-screen${highContrastMonochrome ? " mirror-screen-monochrome" : ""}`}>
       <header className="mirror-header">
         <h1>{mirrorName}</h1>
       </header>
