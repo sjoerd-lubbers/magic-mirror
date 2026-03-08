@@ -580,14 +580,15 @@ export function MirrorClient({
               <>
                 {moduleSettings.WEATHER.config.showCurrent && weather.current ? (
                   <div className="weather-current">
-                    <p className="weather-temp">
-                      <span className="weather-temp-value">{weather.current.temperatureC}</span>
-                      <span className="weather-temp-unit">°C</span>
-                    </p>
-                    <p>
-                      {weatherIconToEmoji(weather.current.icon)} {weather.current.description}
-                    </p>
-                    <p className="muted">{weather.current.city}</p>
+                    <div className="weather-current-main">
+                      <strong className="weather-current-icon">
+                        {weatherIconToEmoji(weather.current.icon)}
+                      </strong>
+                      <p className="weather-temp">
+                        <span className="weather-temp-value">{weather.current.temperatureC}</span>
+                        <span className="weather-temp-unit">°C</span>
+                      </p>
+                    </div>
                   </div>
                 ) : null}
 
