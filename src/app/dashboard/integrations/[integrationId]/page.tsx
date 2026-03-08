@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { getCalendarCacheOverview } from "@/lib/calendar";
 import { getOpenWeatherApiKey, getSmtpConfig } from "@/lib/config";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
 import {
@@ -12,6 +13,7 @@ import {
   saveHouseholdICloudSettings,
   saveHouseholdTodoistSettings,
 } from "@/lib/household-integrations";
+import { getTodoistCacheOverview } from "@/lib/todoist";
 
 const INTEGRATION_IDS = ["icloud", "todoist", "openweather", "smtp"] as const;
 type IntegrationId = (typeof INTEGRATION_IDS)[number];
@@ -57,6 +59,26 @@ function integrationNotice(
   }
 
   return null;
+}
+
+function formatDateTime(iso: string | null) {
+  if (!iso) {
+    return "n.v.t.";
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "n.v.t.";
+  }
+
+  return new Intl.DateTimeFormat("nl-NL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
 
 async function saveICloudSettingsAction(formData: FormData) {
@@ -160,8 +182,12 @@ export default async function DashboardIntegrationDetailPage({
   const smtp = getSmtpConfig();
   const openWeatherApiKey = getOpenWeatherApiKey();
   const stored = await getHouseholdIntegrationSettings(membership.householdId);
-  const calendar = await getHouseholdCalendarRuntimeConfig(membership.householdId);
-  const todoist = await getHouseholdTodoistRuntimeConfig(membership.householdId);
+  const [calendar, todoist] = await Promise.all([
+    getHouseholdCalendarRuntimeConfig(membership.householdId),
+    getHouseholdTodoistRuntimeConfig(membership.householdId),
+  ]);
+  const calendarCache = getCalendarCacheOverview(membership.householdId);
+  const todoistCache = getTodoistCacheOverview(membership.householdId);
   const maskedIcloudPassword = calendar.password ? SECRET_MASK : "";
   const maskedTodoistToken = todoist.apiToken ? SECRET_MASK : "";
 
@@ -195,6 +221,39 @@ export default async function DashboardIntegrationDetailPage({
               Bron: {calendar.source === "household" ? "Gezinsconfiguratie" : ".env fallback"}
             </p>
             <p className="muted">Base URL: {calendar.baseUrl}</p>
+            <div className="module-config-card stack-small integration-diagnostics-card">
+              <h4>Verversing en cache</h4>
+              <dl className="integration-diagnostics-list">
+                <div>
+                  <dt>Cache TTL</dt>
+                  <dd>{Math.max(30, calendar.cacheSeconds)}s</dd>
+                </div>
+                <div>
+                  <dt>Cache entries</dt>
+                  <dd>{calendarCache.entryCount}</dd>
+                </div>
+                <div>
+                  <dt>Actieve entries</dt>
+                  <dd>{calendarCache.activeEntryCount}</dd>
+                </div>
+                <div>
+                  <dt>Laatste fetch</dt>
+                  <dd>{formatDateTime(calendarCache.latestFetchedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Volgende expiry</dt>
+                  <dd>{formatDateTime(calendarCache.nextExpiryAt)}</dd>
+                </div>
+                <div>
+                  <dt>Resterend</dt>
+                  <dd>
+                    {calendarCache.nextExpiryInSeconds !== null
+                      ? `${calendarCache.nextExpiryInSeconds}s`
+                      : "n.v.t."}
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
             {canManage ? (
               <form action={saveICloudSettingsAction} className="module-config-grid">
@@ -262,6 +321,39 @@ export default async function DashboardIntegrationDetailPage({
               Bron: {todoist.source === "household" ? "Gezinsconfiguratie" : ".env fallback"}
             </p>
             <p className="muted">Project ID: {todoist.projectId || "(geen projectfilter)"}</p>
+            <div className="module-config-card stack-small integration-diagnostics-card">
+              <h4>Verversing en cache</h4>
+              <dl className="integration-diagnostics-list">
+                <div>
+                  <dt>Server cache TTL</dt>
+                  <dd>{Math.max(15, todoist.cacheSeconds)}s</dd>
+                </div>
+                <div>
+                  <dt>Cache entries</dt>
+                  <dd>{todoistCache.entryCount}</dd>
+                </div>
+                <div>
+                  <dt>Actieve entries</dt>
+                  <dd>{todoistCache.activeEntryCount}</dd>
+                </div>
+                <div>
+                  <dt>Laatste fetch</dt>
+                  <dd>{formatDateTime(todoistCache.latestFetchedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Volgende expiry</dt>
+                  <dd>{formatDateTime(todoistCache.nextExpiryAt)}</dd>
+                </div>
+                <div>
+                  <dt>Resterend</dt>
+                  <dd>
+                    {todoistCache.nextExpiryInSeconds !== null
+                      ? `${todoistCache.nextExpiryInSeconds}s`
+                      : "n.v.t."}
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
             {canManage ? (
               <form action={saveTodoistSettingsAction} className="module-config-grid">
@@ -322,6 +414,23 @@ export default async function DashboardIntegrationDetailPage({
                 ? "API key beschikbaar in .env (globale instelling)."
                 : "OPENWEATHER_API_KEY ontbreekt in .env."}
             </p>
+            <div className="module-config-card stack-small integration-diagnostics-card">
+              <h4>Verversing en cache</h4>
+              <dl className="integration-diagnostics-list">
+                <div>
+                  <dt>Huidig weer</dt>
+                  <dd>15 min revalidate</dd>
+                </div>
+                <div>
+                  <dt>Forecast</dt>
+                  <dd>24 uur revalidate</dd>
+                </div>
+                <div>
+                  <dt>Cache type</dt>
+                  <dd>Next.js fetch-cache</dd>
+                </div>
+              </dl>
+            </div>
           </div>
         ) : null}
 

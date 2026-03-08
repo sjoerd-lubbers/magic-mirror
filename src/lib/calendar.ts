@@ -17,6 +17,25 @@ export type CalendarModuleData = {
   fetchedAt: string;
 };
 
+export type CalendarCacheDiagnostics = {
+  configSource: "env" | "household";
+  cacheSeconds: number;
+  hasCredentials: boolean;
+  cacheKey: string;
+  cacheHit: boolean;
+  fetchedAt: string | null;
+  expiresAt: string | null;
+  secondsUntilExpiry: number | null;
+};
+
+export type CalendarCacheOverview = {
+  entryCount: number;
+  activeEntryCount: number;
+  latestFetchedAt: string | null;
+  nextExpiryAt: string | null;
+  nextExpiryInSeconds: number | null;
+};
+
 type CachedCalendarData = {
   expiresAt: number;
   data: CalendarModuleData;
@@ -536,13 +555,13 @@ export async function getCalendarModuleData({
   }
 
   const normalizedDays = Math.max(1, Math.min(30, Math.trunc(daysAhead)));
-  const cacheKey = [
+  const cacheKey = buildCalendarCacheKey({
     householdId,
-    calendarConfig.baseUrl,
-    calendarConfig.username,
-    calendarName.trim().toLowerCase(),
+    baseUrl: calendarConfig.baseUrl,
+    username: calendarConfig.username,
+    calendarName,
     normalizedDays,
-  ].join("|");
+  });
 
   const cached = calendarCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -572,4 +591,101 @@ export async function getCalendarModuleData({
     });
     return null;
   }
+}
+
+function buildCalendarCacheKey({
+  householdId,
+  baseUrl,
+  username,
+  calendarName,
+  normalizedDays,
+}: {
+  householdId: string;
+  baseUrl: string;
+  username: string;
+  calendarName: string;
+  normalizedDays: number;
+}) {
+  return [
+    householdId,
+    baseUrl,
+    username,
+    calendarName.trim().toLowerCase(),
+    normalizedDays,
+  ].join("|");
+}
+
+export async function getCalendarCacheDiagnostics({
+  householdId,
+  calendarName,
+  daysAhead,
+}: {
+  householdId: string;
+  calendarName: string;
+  daysAhead: number;
+}): Promise<CalendarCacheDiagnostics> {
+  const calendarConfig = await getHouseholdCalendarRuntimeConfig(householdId);
+  const hasCredentials = Boolean(
+    calendarConfig.username.trim() && calendarConfig.password.trim(),
+  );
+  const normalizedDays = Math.max(1, Math.min(30, Math.trunc(daysAhead)));
+  const cacheKey = buildCalendarCacheKey({
+    householdId,
+    baseUrl: calendarConfig.baseUrl,
+    username: calendarConfig.username,
+    calendarName,
+    normalizedDays,
+  });
+  const cached = calendarCache.get(cacheKey);
+  const now = Date.now();
+  const cacheHit = Boolean(cached && cached.expiresAt > now);
+
+  return {
+    configSource: calendarConfig.source,
+    cacheSeconds: Math.max(30, calendarConfig.cacheSeconds),
+    hasCredentials,
+    cacheKey,
+    cacheHit,
+    fetchedAt: cached?.data.fetchedAt ?? null,
+    expiresAt: cached ? new Date(cached.expiresAt).toISOString() : null,
+    secondsUntilExpiry: cached ? Math.max(0, Math.ceil((cached.expiresAt - now) / 1000)) : null,
+  };
+}
+
+export function getCalendarCacheOverview(householdId: string): CalendarCacheOverview {
+  const prefix = `${householdId}|`;
+  const now = Date.now();
+
+  let entryCount = 0;
+  let activeEntryCount = 0;
+  let latestFetchedAtMs: number | null = null;
+  let nextExpiryMs: number | null = null;
+
+  for (const [cacheKey, entry] of calendarCache.entries()) {
+    if (!cacheKey.startsWith(prefix)) {
+      continue;
+    }
+
+    entryCount += 1;
+
+    if (entry.expiresAt > now) {
+      activeEntryCount += 1;
+      if (nextExpiryMs === null || entry.expiresAt < nextExpiryMs) {
+        nextExpiryMs = entry.expiresAt;
+      }
+    }
+
+    const fetchedAtMs = Date.parse(entry.data.fetchedAt);
+    if (!Number.isNaN(fetchedAtMs) && (latestFetchedAtMs === null || fetchedAtMs > latestFetchedAtMs)) {
+      latestFetchedAtMs = fetchedAtMs;
+    }
+  }
+
+  return {
+    entryCount,
+    activeEntryCount,
+    latestFetchedAt: latestFetchedAtMs ? new Date(latestFetchedAtMs).toISOString() : null,
+    nextExpiryAt: nextExpiryMs ? new Date(nextExpiryMs).toISOString() : null,
+    nextExpiryInSeconds: nextExpiryMs ? Math.max(0, Math.ceil((nextExpiryMs - now) / 1000)) : null,
+  };
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "Mirror"
+ADD COLUMN "showAlignmentGrid" BOOLEAN NOT NULL DEFAULT false;

@@ -51,6 +51,15 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const type = parsed.data.type as MirrorModuleType;
+  const mirror = await prisma.mirror.findUnique({
+    where: { id: mirrorId },
+    select: { gridRows: true },
+  });
+
+  if (!mirror) {
+    return NextResponse.json({ error: "Spiegel niet gevonden" }, { status: 404 });
+  }
+
   const existing = await prisma.mirrorModule.findUnique({
     where: {
       mirrorId_type: {
@@ -62,8 +71,8 @@ export async function POST(request: Request, { params }: Params) {
 
   const normalizedConfig =
     parsed.data.config === undefined
-      ? readModuleConfig(type, existing?.config ?? null)
-      : normalizeModuleConfig(type, parsed.data.config);
+      ? readModuleConfig(type, existing?.config ?? null, { rows: mirror.gridRows })
+      : normalizeModuleConfig(type, parsed.data.config, { rows: mirror.gridRows });
   const nextEnabled = parsed.data.enabled ?? existing?.enabled ?? true;
 
   const moduleState = await prisma.mirrorModule.upsert({

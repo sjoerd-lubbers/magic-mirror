@@ -32,6 +32,8 @@ const mirrorSettingsSnapshotSchema = z.object({
     longitude: z.number().nullable(),
     timezone: z.string().nullable(),
     highContrastMonochrome: z.boolean(),
+    showAlignmentGrid: z.boolean().optional().default(false),
+    gridRows: z.number().int().min(12).max(24).optional().default(12),
   }),
   modules: z.array(moduleSettingsSnapshotSchema),
 });
@@ -47,6 +49,8 @@ type MirrorSnapshotSource = {
   longitude: number | null;
   timezone: string | null;
   highContrastMonochrome: boolean;
+  showAlignmentGrid: boolean;
+  gridRows: number;
   modules: Array<{
     type: string;
     enabled: boolean;
@@ -91,6 +95,8 @@ export function buildMirrorSettingsSnapshot(
       longitude: mirror.longitude,
       timezone: mirror.timezone,
       highContrastMonochrome: mirror.highContrastMonochrome,
+      showAlignmentGrid: mirror.showAlignmentGrid,
+      gridRows: mirror.gridRows,
     },
     modules,
   };

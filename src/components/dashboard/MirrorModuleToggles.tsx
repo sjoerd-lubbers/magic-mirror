@@ -16,6 +16,7 @@ import type {
 type MirrorModuleTogglesProps = {
   mirrorId: string;
   initialModules: ModuleSettingsListItem[];
+  gridRows?: number;
 };
 
 type EditableModule = {
@@ -66,7 +67,9 @@ function createAttentionItem(): AttentionCounterItem {
 export function MirrorModuleToggles({
   mirrorId,
   initialModules,
+  gridRows = 12,
 }: MirrorModuleTogglesProps) {
+  const maxGridRows = Math.max(12, gridRows);
   const [modules, setModules] = useState<EditableModule[]>(
     initialModules as EditableModule[],
   );
@@ -83,6 +86,13 @@ export function MirrorModuleToggles({
 
   const modulesByType = useMemo(
     () => new Map(modules.map((module) => [module.type, module])),
+    [modules],
+  );
+  const sortedModules = useMemo(
+    () =>
+      [...modules].sort((a, b) =>
+        LABELS[a.type].localeCompare(LABELS[b.type], "nl-NL"),
+      ),
     [modules],
   );
 
@@ -166,114 +176,128 @@ export function MirrorModuleToggles({
 
   return (
     <div className="module-config-list">
-      {modules.map((module) => {
+      {sortedModules.map((module) => {
         const saveState = saveStateByType[module.type];
 
         return (
           <article key={module.type} className="module-config-card">
-            <div className="section-header">
-              <h4>{LABELS[module.type]}</h4>
-              <label className="inline-checkbox">
-                <input
-                  type="checkbox"
-                  checked={module.enabled}
-                  onChange={(event) =>
-                    setModule(module.type, (current) => ({
-                      ...current,
-                      enabled: event.target.checked,
-                    }))
-                  }
-                />
-                <span>Actief</span>
-              </label>
-            </div>
+            <details className="module-config-disclosure">
+              <summary className="module-config-summary">
+                <span className="module-config-summary-title">{LABELS[module.type]}</span>
+                <span className={`status-chip ${module.enabled ? "ok" : "warn"}`}>
+                  {module.enabled ? "Actief" : "Uit"}
+                </span>
+              </summary>
 
-            <div className="module-config-grid">
-              {module.type === "CLOCK" ? (
-                <ClockSettings
-                  config={module.config as ClockModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("CLOCK", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
+              <div className="module-config-disclosure-body">
+                <label className="inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={module.enabled}
+                    onChange={(event) =>
+                      setModule(module.type, (current) => ({
+                        ...current,
+                        enabled: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Actief</span>
+                </label>
 
-              {module.type === "WEATHER" ? (
-                <WeatherSettings
-                  config={module.config as WeatherModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("WEATHER", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
+                <div className="module-config-grid">
+                  {module.type === "CLOCK" ? (
+                    <ClockSettings
+                      config={module.config as ClockModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("CLOCK", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
 
-              {module.type === "TIMERS" ? (
-                <TimerSettings
-                  config={module.config as TimersModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("TIMERS", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
+                  {module.type === "WEATHER" ? (
+                    <WeatherSettings
+                      config={module.config as WeatherModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("WEATHER", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
 
-              {module.type === "CALENDAR" ? (
-                <CalendarSettings
-                  config={module.config as CalendarModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("CALENDAR", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
+                  {module.type === "TIMERS" ? (
+                    <TimerSettings
+                      config={module.config as TimersModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("TIMERS", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
 
-              {module.type === "ATTENTION" ? (
-                <AttentionSettings
-                  config={module.config as AttentionModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("ATTENTION", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
+                  {module.type === "CALENDAR" ? (
+                    <CalendarSettings
+                      config={module.config as CalendarModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("CALENDAR", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
 
-              {module.type === "TODOIST" ? (
-                <TodoistSettings
-                  config={module.config as TodoistModuleConfig}
-                  onChange={(nextConfig) =>
-                    setModule("TODOIST", (current) => ({
-                      ...current,
-                      config: nextConfig,
-                    }))
-                  }
-                />
-              ) : null}
-            </div>
+                  {module.type === "ATTENTION" ? (
+                    <AttentionSettings
+                      config={module.config as AttentionModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("ATTENTION", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
 
-            <div className="module-actions">
-              <button
-                type="button"
-                className="button-link button-small"
-                onClick={() => saveModule(module.type)}
-                disabled={saveState.busy}
-              >
-                {saveState.busy ? "Opslaan..." : "Opslaan"}
-              </button>
-              {saveState.error ? <p className="notice error">{saveState.error}</p> : null}
-              {saveState.info ? <p className="notice success">{saveState.info}</p> : null}
-            </div>
+                  {module.type === "TODOIST" ? (
+                    <TodoistSettings
+                      config={module.config as TodoistModuleConfig}
+                      gridRows={maxGridRows}
+                      onChange={(nextConfig) =>
+                        setModule("TODOIST", (current) => ({
+                          ...current,
+                          config: nextConfig,
+                        }))
+                      }
+                    />
+                  ) : null}
+                </div>
+
+                <div className="module-actions">
+                  <button
+                    type="button"
+                    className="button-link button-small"
+                    onClick={() => saveModule(module.type)}
+                    disabled={saveState.busy}
+                  >
+                    {saveState.busy ? "Opslaan..." : "Opslaan"}
+                  </button>
+                  {saveState.error ? <p className="notice error">{saveState.error}</p> : null}
+                  {saveState.info ? <p className="notice success">{saveState.info}</p> : null}
+                </div>
+              </div>
+            </details>
           </article>
         );
       })}
@@ -283,70 +307,81 @@ export function MirrorModuleToggles({
 
 function LayoutEditor({
   layout,
+  gridRows,
   onChange,
 }: {
   layout: { x: number; y: number; w: number; h: number };
+  gridRows: number;
   onChange: (next: { x: number; y: number; w: number; h: number }) => void;
 }) {
   return (
-    <div className="layout-grid">
-      <label>
-        X
-        <input
-          type="number"
-          min={1}
-          max={12}
-          value={layout.x}
-          onChange={(event) =>
-            onChange({ ...layout, x: toNumber(event.target.value, layout.x) })
-          }
-        />
-      </label>
-      <label>
-        Y
-        <input
-          type="number"
-          min={1}
-          max={12}
-          value={layout.y}
-          onChange={(event) =>
-            onChange({ ...layout, y: toNumber(event.target.value, layout.y) })
-          }
-        />
-      </label>
-      <label>
-        Breedte
-        <input
-          type="number"
-          min={1}
-          max={12}
-          value={layout.w}
-          onChange={(event) =>
-            onChange({ ...layout, w: toNumber(event.target.value, layout.w) })
-          }
-        />
-      </label>
-      <label>
-        Hoogte
-        <input
-          type="number"
-          min={1}
-          max={8}
-          value={layout.h}
-          onChange={(event) =>
-            onChange({ ...layout, h: toNumber(event.target.value, layout.h) })
-          }
-        />
-      </label>
-    </div>
+    <details className="details-panel">
+      <summary className="details-summary">
+        Plaatsing: x{layout.x}, y{layout.y}, b{layout.w}, h{layout.h}
+      </summary>
+      <div className="details-body">
+        <div className="layout-grid">
+          <label>
+            X
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={layout.x}
+              onChange={(event) =>
+                onChange({ ...layout, x: toNumber(event.target.value, layout.x) })
+              }
+            />
+          </label>
+          <label>
+            Y
+            <input
+              type="number"
+              min={1}
+              max={gridRows}
+              value={layout.y}
+              onChange={(event) =>
+                onChange({ ...layout, y: toNumber(event.target.value, layout.y) })
+              }
+            />
+          </label>
+          <label>
+            Breedte
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={layout.w}
+              onChange={(event) =>
+                onChange({ ...layout, w: toNumber(event.target.value, layout.w) })
+              }
+            />
+          </label>
+          <label>
+            Hoogte
+            <input
+              type="number"
+              min={1}
+              max={gridRows}
+              value={layout.h}
+              onChange={(event) =>
+                onChange({ ...layout, h: toNumber(event.target.value, layout.h) })
+              }
+            />
+          </label>
+        </div>
+      </div>
+    </details>
   );
 }
 
 function ClockSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: ClockModuleConfig;
+  gridRows: number;
   onChange: (next: ClockModuleConfig) => void;
 }) {
   return (
@@ -394,8 +429,20 @@ function ClockSettings({
         <span>Toon seconden</span>
       </label>
 
+      <label className="inline-checkbox">
+        <input
+          type="checkbox"
+          checked={config.showDate}
+          onChange={(event) =>
+            onChange({ ...config, showDate: event.target.checked })
+          }
+        />
+        <span>Toon datum boven de tijd</span>
+      </label>
+
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>
@@ -404,9 +451,11 @@ function ClockSettings({
 
 function WeatherSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: WeatherModuleConfig;
+  gridRows: number;
   onChange: (next: WeatherModuleConfig) => void;
 }) {
   return (
@@ -453,6 +502,7 @@ function WeatherSettings({
 
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>
@@ -461,9 +511,11 @@ function WeatherSettings({
 
 function TimerSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: TimersModuleConfig;
+  gridRows: number;
   onChange: (next: TimersModuleConfig) => void;
 }) {
   return (
@@ -502,6 +554,7 @@ function TimerSettings({
 
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>
@@ -510,9 +563,11 @@ function TimerSettings({
 
 function CalendarSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: CalendarModuleConfig;
+  gridRows: number;
   onChange: (next: CalendarModuleConfig) => void;
 }) {
   return (
@@ -595,6 +650,7 @@ function CalendarSettings({
 
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>
@@ -603,9 +659,11 @@ function CalendarSettings({
 
 function AttentionSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: AttentionModuleConfig;
+  gridRows: number;
   onChange: (next: AttentionModuleConfig) => void;
 }) {
   function updateItem(id: string, patch: Partial<AttentionCounterItem>) {
@@ -706,6 +764,7 @@ function AttentionSettings({
 
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>
@@ -714,9 +773,11 @@ function AttentionSettings({
 
 function TodoistSettings({
   config,
+  gridRows,
   onChange,
 }: {
   config: TodoistModuleConfig;
+  gridRows: number;
   onChange: (next: TodoistModuleConfig) => void;
 }) {
   return (
@@ -785,6 +846,7 @@ function TodoistSettings({
 
       <LayoutEditor
         layout={config.layout}
+        gridRows={gridRows}
         onChange={(layout) => onChange({ ...config, layout })}
       />
     </>

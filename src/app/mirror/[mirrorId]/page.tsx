@@ -44,6 +44,7 @@ export default async function MirrorPage({ params }: MirrorPageProps) {
       enabled: module.enabled,
       config: module.config,
     })),
+    { rows: mirror.gridRows },
   );
 
   const weather = modules.WEATHER.enabled
@@ -76,6 +77,8 @@ export default async function MirrorPage({ params }: MirrorPageProps) {
       mirrorId={mirror.id}
       mirrorName={mirror.name}
       highContrastMonochrome={mirror.highContrastMonochrome}
+      showAlignmentGrid={mirror.showAlignmentGrid}
+      gridRows={mirror.gridRows}
       modules={modules}
       weather={weather}
       calendar={calendar}

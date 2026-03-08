@@ -24,7 +24,9 @@ type MirrorEvent =
   | {
       type: "mirror_updated";
       mirror: {
-        highContrastMonochrome: boolean;
+        highContrastMonochrome?: boolean;
+        showAlignmentGrid?: boolean;
+        gridRows?: number;
       };
     };
 

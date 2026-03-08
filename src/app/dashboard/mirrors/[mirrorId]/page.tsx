@@ -7,6 +7,10 @@ import { requireUser } from "@/lib/auth";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
 import {
   buildModuleSettingsMap,
+  normalizeGridRows,
+  normalizeModuleConfig,
+  readModuleConfig,
+  type MirrorModuleType,
   toModuleSettingsList,
 } from "@/lib/module-config";
 import { parseMirrorSettingsSnapshot } from "@/lib/mirror-settings";
@@ -17,6 +21,14 @@ type MirrorManagePageProps = {
   params: Promise<{ mirrorId: string }>;
   searchParams: Promise<{ copy?: string; reason?: string }>;
 };
+
+const GRID_ROW_STEPS = [12, 14, 16, 18, 20, 22, 24] as const;
+
+function nextGridRows(currentRows: number) {
+  const normalized = normalizeGridRows(currentRows);
+  const next = GRID_ROW_STEPS.find((value) => value > normalized);
+  return next ?? GRID_ROW_STEPS[0];
+}
 
 function copyNotice({
   status,
@@ -144,6 +156,155 @@ async function toggleMirrorContrastAction(formData: FormData) {
   redirect(`/dashboard/mirrors/${mirror.id}`);
 }
 
+async function toggleMirrorGridAction(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const membership = await getPrimaryHouseholdForUser(user.id);
+
+  if (!membership) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const canManageMirrors =
+    membership.role === "OWNER" || user.role === "PLATFORM_ADMIN";
+  if (!canManageMirrors) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const mirrorId = String(formData.get("mirrorId") ?? "").trim();
+  if (!mirrorId) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const enable = String(formData.get("enable") ?? "") === "1";
+
+  const mirror = await prisma.mirror.findFirst({
+    where: {
+      id: mirrorId,
+      householdId: membership.householdId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!mirror) {
+    redirect("/dashboard/mirrors");
+  }
+
+  await prisma.mirror.update({
+    where: {
+      id: mirror.id,
+    },
+    data: {
+      showAlignmentGrid: enable,
+    },
+  });
+
+  broadcastToMirror(mirror.id, {
+    type: "mirror_updated",
+    mirror: {
+      showAlignmentGrid: enable,
+    },
+  });
+
+  redirect(`/dashboard/mirrors/${mirror.id}`);
+}
+
+async function cycleMirrorGridRowsAction(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const membership = await getPrimaryHouseholdForUser(user.id);
+
+  if (!membership) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const canManageMirrors =
+    membership.role === "OWNER" || user.role === "PLATFORM_ADMIN";
+  if (!canManageMirrors) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const mirrorId = String(formData.get("mirrorId") ?? "").trim();
+  if (!mirrorId) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const mirror = await prisma.mirror.findFirst({
+    where: {
+      id: mirrorId,
+      householdId: membership.householdId,
+    },
+    include: {
+      modules: true,
+    },
+  });
+
+  if (!mirror) {
+    redirect("/dashboard/mirrors");
+  }
+
+  const oldRows = normalizeGridRows(mirror.gridRows);
+  const newRows = nextGridRows(oldRows);
+
+  if (newRows === oldRows) {
+    redirect(`/dashboard/mirrors/${mirror.id}`);
+  }
+
+  const factor = newRows / oldRows;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.mirror.update({
+      where: { id: mirror.id },
+      data: { gridRows: newRows },
+    });
+
+    for (const module of mirror.modules) {
+      const type = module.type as unknown as MirrorModuleType;
+      const currentConfig = readModuleConfig(type, module.config, { rows: oldRows });
+      const scaledY = Math.max(1, Math.round((currentConfig.layout.y - 1) * factor) + 1);
+      const scaledH = Math.max(1, Math.round(currentConfig.layout.h * factor));
+
+      const normalizedConfig = normalizeModuleConfig(
+        type,
+        {
+          ...currentConfig,
+          layout: {
+            ...currentConfig.layout,
+            y: scaledY,
+            h: scaledH,
+          },
+        },
+        { rows: newRows },
+      );
+
+      await tx.mirrorModule.update({
+        where: {
+          mirrorId_type: {
+            mirrorId: mirror.id,
+            type: module.type as ModuleType,
+          },
+        },
+        data: {
+          config: JSON.stringify(normalizedConfig),
+        },
+      });
+    }
+  });
+
+  broadcastToMirror(mirror.id, {
+    type: "mirror_updated",
+    mirror: {
+      gridRows: newRows,
+    },
+  });
+
+  redirect(`/dashboard/mirrors/${mirror.id}`);
+}
+
 async function importMirrorSettingsAction(formData: FormData) {
   "use server";
 
@@ -196,6 +357,8 @@ async function importMirrorSettingsAction(formData: FormData) {
         longitude: snapshot.mirror.longitude,
         timezone: snapshot.mirror.timezone,
         highContrastMonochrome: snapshot.mirror.highContrastMonochrome,
+        showAlignmentGrid: snapshot.mirror.showAlignmentGrid,
+        gridRows: snapshot.mirror.gridRows,
       },
     });
 
@@ -259,6 +422,14 @@ export default async function MirrorManagePage({
   }
 
   const notice = copyNotice({ status: query.copy, reason: query.reason });
+  const moduleSettingsMap = buildModuleSettingsMap(
+    mirror.modules.map((module) => ({
+      type: module.type,
+      enabled: module.enabled,
+      config: module.config,
+    })),
+    { rows: mirror.gridRows },
+  );
 
   return (
     <main className="stack">
@@ -310,6 +481,29 @@ export default async function MirrorManagePage({
               </button>
             </form>
           ) : null}
+
+          {canManageMirrors ? (
+            <form action={toggleMirrorGridAction}>
+              <input type="hidden" name="mirrorId" value={mirror.id} />
+              <input
+                type="hidden"
+                name="enable"
+                value={mirror.showAlignmentGrid ? "0" : "1"}
+              />
+              <button type="submit" className="button-secondary button-small">
+                {mirror.showAlignmentGrid ? "Raster uit" : "Raster aan"}
+              </button>
+            </form>
+          ) : null}
+
+          {canManageMirrors ? (
+            <form action={cycleMirrorGridRowsAction}>
+              <input type="hidden" name="mirrorId" value={mirror.id} />
+              <button type="submit" className="button-secondary button-small">
+                Raster rijen: {mirror.gridRows} (volgende)
+              </button>
+            </form>
+          ) : null}
         </div>
       </section>
 
@@ -317,15 +511,8 @@ export default async function MirrorManagePage({
         <h3>Module instellingen</h3>
         <MirrorModuleToggles
           mirrorId={mirror.id}
-          initialModules={toModuleSettingsList(
-            buildModuleSettingsMap(
-              mirror.modules.map((module) => ({
-                type: module.type,
-                enabled: module.enabled,
-                config: module.config,
-              })),
-            ),
-          )}
+          gridRows={mirror.gridRows}
+          initialModules={toModuleSettingsList(moduleSettingsMap)}
         />
       </section>
 

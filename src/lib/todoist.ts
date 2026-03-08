@@ -20,6 +20,25 @@ export type TodoistModuleData = {
   fetchedAt: string;
 };
 
+export type TodoistCacheDiagnostics = {
+  configSource: "env" | "household";
+  cacheSeconds: number;
+  hasApiToken: boolean;
+  cacheKey: string;
+  cacheHit: boolean;
+  fetchedAt: string | null;
+  expiresAt: string | null;
+  secondsUntilExpiry: number | null;
+};
+
+export type TodoistCacheOverview = {
+  entryCount: number;
+  activeEntryCount: number;
+  latestFetchedAt: string | null;
+  nextExpiryAt: string | null;
+  nextExpiryInSeconds: number | null;
+};
+
 type CacheEntry = {
   expiresAt: number;
   data: TodoistModuleData;
@@ -152,7 +171,12 @@ export async function getTodoistModuleData({
     return null;
   }
 
-  const cacheKey = `${householdId}:${apiToken}:${projectId || "all"}:${maxVisible}`;
+  const cacheKey = buildTodoistCacheKey({
+    householdId,
+    apiToken,
+    projectId,
+    maxVisible,
+  });
   const cached = todoistCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
@@ -233,4 +257,90 @@ export async function getTodoistModuleData({
     });
     return null;
   }
+}
+
+function buildTodoistCacheKey({
+  householdId,
+  apiToken,
+  projectId,
+  maxVisible,
+}: {
+  householdId: string;
+  apiToken: string;
+  projectId: string;
+  maxVisible: number;
+}) {
+  return `${householdId}:${apiToken}:${projectId || "all"}:${maxVisible}`;
+}
+
+export async function getTodoistCacheDiagnostics({
+  householdId,
+  projectId: projectIdOverride,
+  maxVisible,
+}: {
+  householdId: string;
+  projectId: string;
+  maxVisible: number;
+}): Promise<TodoistCacheDiagnostics> {
+  const todoist = await getHouseholdTodoistRuntimeConfig(householdId);
+  const apiToken = todoist.apiToken.trim();
+  const projectId = (projectIdOverride || todoist.projectId || "").trim();
+  const cacheKey = buildTodoistCacheKey({
+    householdId,
+    apiToken,
+    projectId,
+    maxVisible,
+  });
+  const cached = todoistCache.get(cacheKey);
+  const now = Date.now();
+  const cacheHit = Boolean(cached && cached.expiresAt > now);
+
+  return {
+    configSource: todoist.source,
+    cacheSeconds: Math.max(15, todoist.cacheSeconds),
+    hasApiToken: Boolean(apiToken),
+    cacheKey,
+    cacheHit,
+    fetchedAt: cached?.data.fetchedAt ?? null,
+    expiresAt: cached ? new Date(cached.expiresAt).toISOString() : null,
+    secondsUntilExpiry: cached ? Math.max(0, Math.ceil((cached.expiresAt - now) / 1000)) : null,
+  };
+}
+
+export function getTodoistCacheOverview(householdId: string): TodoistCacheOverview {
+  const prefix = `${householdId}:`;
+  const now = Date.now();
+
+  let entryCount = 0;
+  let activeEntryCount = 0;
+  let latestFetchedAtMs: number | null = null;
+  let nextExpiryMs: number | null = null;
+
+  for (const [cacheKey, entry] of todoistCache.entries()) {
+    if (!cacheKey.startsWith(prefix)) {
+      continue;
+    }
+
+    entryCount += 1;
+
+    if (entry.expiresAt > now) {
+      activeEntryCount += 1;
+      if (nextExpiryMs === null || entry.expiresAt < nextExpiryMs) {
+        nextExpiryMs = entry.expiresAt;
+      }
+    }
+
+    const fetchedAtMs = Date.parse(entry.data.fetchedAt);
+    if (!Number.isNaN(fetchedAtMs) && (latestFetchedAtMs === null || fetchedAtMs > latestFetchedAtMs)) {
+      latestFetchedAtMs = fetchedAtMs;
+    }
+  }
+
+  return {
+    entryCount,
+    activeEntryCount,
+    latestFetchedAt: latestFetchedAtMs ? new Date(latestFetchedAtMs).toISOString() : null,
+    nextExpiryAt: nextExpiryMs ? new Date(nextExpiryMs).toISOString() : null,
+    nextExpiryInSeconds: nextExpiryMs ? Math.max(0, Math.ceil((nextExpiryMs - now) / 1000)) : null,
+  };
 }

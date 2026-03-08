@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CalendarModuleData } from "@/lib/calendar";
 import { MIRROR_ID_STORAGE_KEY } from "@/lib/mirror-device";
 import {
+  MIRROR_GRID_COLUMNS,
   normalizeModuleConfig,
+  normalizeGridRows,
   type MirrorModuleType,
   type ModuleSettingsMap,
 } from "@/lib/module-config";
@@ -23,6 +25,8 @@ type MirrorClientProps = {
   mirrorId: string;
   mirrorName: string;
   highContrastMonochrome: boolean;
+  showAlignmentGrid: boolean;
+  gridRows: number;
   modules: ModuleSettingsMap;
   weather: WeatherModuleData | null;
   calendar: CalendarModuleData | null;
@@ -70,6 +74,17 @@ function formatClock(
     second: config.showSeconds ? "2-digit" : undefined,
     hour12: config.hourFormat === "12",
   }).format(now);
+}
+
+function formatClockDate(now: Date) {
+  const raw = new Intl.DateTimeFormat("nl-NL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(now);
+
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 function weatherIconToEmoji(icon: string) {
@@ -186,6 +201,8 @@ export function MirrorClient({
   mirrorId,
   mirrorName,
   highContrastMonochrome,
+  showAlignmentGrid,
+  gridRows,
   modules,
   weather,
   calendar,
@@ -197,6 +214,8 @@ export function MirrorClient({
   const [moduleSettings, setModuleSettings] = useState(modules);
   const [todoistData, setTodoistData] = useState(todoist);
   const [isMonochrome, setIsMonochrome] = useState(highContrastMonochrome);
+  const [showGrid, setShowGrid] = useState(showAlignmentGrid);
+  const [gridRowCount, setGridRowCount] = useState(normalizeGridRows(gridRows));
   const announcedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -233,6 +252,8 @@ export function MirrorClient({
               };
               mirror?: {
                 highContrastMonochrome?: boolean;
+                showAlignmentGrid?: boolean;
+                gridRows?: number;
               };
             }
           | null = null;
@@ -248,6 +269,8 @@ export function MirrorClient({
             };
             mirror?: {
               highContrastMonochrome?: boolean;
+              showAlignmentGrid?: boolean;
+              gridRows?: number;
             };
           };
         } catch {
@@ -264,7 +287,9 @@ export function MirrorClient({
           typeof payload.module.enabled === "boolean"
         ) {
           const type = payload.module.type;
-          const normalizedConfig = normalizeModuleConfig(type, payload.module.config);
+          const normalizedConfig = normalizeModuleConfig(type, payload.module.config, {
+            rows: gridRowCount,
+          });
           setModuleSettings((current) => ({
             ...current,
             [type]: {
@@ -279,6 +304,20 @@ export function MirrorClient({
           typeof payload.mirror?.highContrastMonochrome === "boolean"
         ) {
           setIsMonochrome(payload.mirror.highContrastMonochrome);
+        }
+
+        if (
+          payload?.type === "mirror_updated" &&
+          typeof payload.mirror?.showAlignmentGrid === "boolean"
+        ) {
+          setShowGrid(payload.mirror.showAlignmentGrid);
+        }
+
+        if (
+          payload?.type === "mirror_updated" &&
+          typeof payload.mirror?.gridRows === "number"
+        ) {
+          setGridRowCount(normalizeGridRows(payload.mirror.gridRows));
         }
       });
 
@@ -300,7 +339,7 @@ export function MirrorClient({
       }
       socket?.close();
     };
-  }, [mirrorId]);
+  }, [gridRowCount, mirrorId]);
 
   useEffect(() => {
     setTodoistData(todoist);
@@ -313,6 +352,14 @@ export function MirrorClient({
   useEffect(() => {
     setIsMonochrome(highContrastMonochrome);
   }, [highContrastMonochrome]);
+
+  useEffect(() => {
+    setShowGrid(showAlignmentGrid);
+  }, [showAlignmentGrid]);
+
+  useEffect(() => {
+    setGridRowCount(normalizeGridRows(gridRows));
+  }, [gridRows]);
 
   useEffect(() => {
     if (!moduleSettings.TODOIST.enabled) {
@@ -408,6 +455,7 @@ export function MirrorClient({
     hourFormat: moduleSettings.CLOCK.config.hourFormat,
     showSeconds: moduleSettings.CLOCK.config.showSeconds,
   });
+  const clockDateText = formatClockDate(now);
   const calendarTitle = moduleSettings.CALENDAR.config.title.trim();
   const todoistTitle = moduleSettings.TODOIST.config.title.trim();
   const calendarFilter = moduleSettings.CALENDAR.config.calendarName.trim();
@@ -418,6 +466,18 @@ export function MirrorClient({
     : null;
   const activeAttentionItems = moduleSettings.ATTENTION.config.items.filter(
     (item) => item.active,
+  );
+  const mirrorGridStyle = useMemo(
+    () =>
+      ({
+        "--mirror-grid-rows": String(gridRowCount),
+      }) as CSSProperties,
+    [gridRowCount],
+  );
+  const rowLabelStep = gridRowCount > 18 ? 2 : 1;
+  const gridRowIndices = useMemo(
+    () => Array.from({ length: gridRowCount }, (_, index) => index + 1),
+    [gridRowCount],
   );
 
   if (timerFocusIsActive && activeTimer) {
@@ -446,19 +506,65 @@ export function MirrorClient({
   }
 
   return (
-    <main className={`mirror-screen${isMonochrome ? " mirror-screen-monochrome" : ""}`}>
+    <main
+      className={`mirror-screen${isMonochrome ? " mirror-screen-monochrome" : ""}${
+        showGrid ? " mirror-screen-show-grid" : ""
+      }`}
+    >
       <header className="mirror-header">
         <h1>{mirrorName}</h1>
       </header>
 
-      <section className="mirror-grid">
+      <section className="mirror-grid" style={mirrorGridStyle}>
+        {showGrid ? (
+          <div className="mirror-grid-overlay" aria-hidden>
+            {Array.from({ length: MIRROR_GRID_COLUMNS }).map((_, index) => (
+              <span
+                key={`vline-${index + 1}`}
+                className="mirror-grid-line mirror-grid-line-v"
+                style={{ gridColumn: `${index + 1} / span 1` }}
+              />
+            ))}
+            {gridRowIndices.map((row) => (
+              <span
+                key={`hline-${row}`}
+                className="mirror-grid-line mirror-grid-line-h"
+                style={{ gridRow: `${row} / span 1` }}
+              />
+            ))}
+            {Array.from({ length: MIRROR_GRID_COLUMNS }).map((_, index) => (
+              <span
+                key={`col-label-${index + 1}`}
+                className="mirror-grid-label mirror-grid-label-col"
+                style={{ gridColumn: `${index + 1} / span 1` }}
+              >
+                {index + 1}
+              </span>
+            ))}
+            {gridRowIndices
+              .filter((row) => row === 1 || row % rowLabelStep === 0)
+              .map((row) => (
+                <span
+                  key={`row-label-${row}`}
+                  className="mirror-grid-label mirror-grid-label-row"
+                  style={{ gridRow: `${row} / span 1` }}
+                >
+                  {row}
+                </span>
+              ))}
+          </div>
+        ) : null}
+
         {moduleSettings.CLOCK.enabled ? (
           <article
             className="mirror-widget widget-clock"
             style={moduleLayoutStyle(moduleSettings.CLOCK.config.layout)}
           >
+            {moduleSettings.CLOCK.config.showDate ? (
+              <p className="clock-date">{clockDateText}</p>
+            ) : null}
             <p
-              className={`clock-time ${moduleSettings.CLOCK.config.size === "large" ? "clock-large" : ""}`}
+              className={`clock-time${moduleSettings.CLOCK.config.size === "large" ? " clock-large" : ""}${moduleSettings.CLOCK.config.showSeconds ? " clock-with-seconds" : ""}${moduleSettings.CLOCK.config.showDate ? " clock-with-date" : ""}`}
             >
               {clockText}
             </p>
@@ -474,7 +580,10 @@ export function MirrorClient({
               <>
                 {moduleSettings.WEATHER.config.showCurrent && weather.current ? (
                   <div className="weather-current">
-                    <p className="weather-temp">{weather.current.temperatureC}°C</p>
+                    <p className="weather-temp">
+                      <span className="weather-temp-value">{weather.current.temperatureC}</span>
+                      <span className="weather-temp-unit">°C</span>
+                    </p>
                     <p>
                       {weatherIconToEmoji(weather.current.icon)} {weather.current.description}
                     </p>

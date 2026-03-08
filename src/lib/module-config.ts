@@ -6,6 +6,11 @@ export type MirrorModuleType =
   | "ATTENTION"
   | "TODOIST";
 
+export const MIRROR_GRID_COLUMNS = 12;
+export const DEFAULT_MIRROR_GRID_ROWS = 12;
+export const MAX_MIRROR_GRID_ROWS = 24;
+export const MIN_MIRROR_GRID_ROWS = 12;
+
 export type ModuleLayout = {
   x: number;
   y: number;
@@ -16,6 +21,7 @@ export type ModuleLayout = {
 export type ClockModuleConfig = {
   hourFormat: "12" | "24";
   showSeconds: boolean;
+  showDate: boolean;
   size: "normal" | "large";
   layout: ModuleLayout;
 };
@@ -138,6 +144,7 @@ function defaultClockConfig(): ClockModuleConfig {
   return {
     hourFormat: "24",
     showSeconds: true,
+    showDate: false,
     size: "normal",
     layout: defaultLayout("CLOCK"),
   };
@@ -237,29 +244,49 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeLayout(type: MirrorModuleType, value: unknown): ModuleLayout {
+export function normalizeGridRows(value: unknown) {
+  const rows = toInt(value, DEFAULT_MIRROR_GRID_ROWS);
+  return clamp(rows, MIN_MIRROR_GRID_ROWS, MAX_MIRROR_GRID_ROWS);
+}
+
+type NormalizeOptions = {
+  rows?: number;
+};
+
+function normalizeLayout(
+  type: MirrorModuleType,
+  value: unknown,
+  options?: NormalizeOptions,
+): ModuleLayout {
   const fallback = defaultLayout(type);
+  const maxRows = normalizeGridRows(options?.rows);
 
   if (!isRecord(value)) {
-    return fallback;
+    const maxFallbackHeight = Math.max(1, maxRows + 1 - fallback.y);
+    return {
+      ...fallback,
+      y: clamp(fallback.y, 1, maxRows),
+      h: clamp(fallback.h, 1, maxFallbackHeight),
+    };
   }
 
-  const x = clamp(toInt(value.x, fallback.x), 1, 12);
-  const y = clamp(toInt(value.y, fallback.y), 1, 12);
-  const w = clamp(toInt(value.w, fallback.w), 1, 12);
-  const h = clamp(toInt(value.h, fallback.h), 1, 8);
+  const x = clamp(toInt(value.x, fallback.x), 1, MIRROR_GRID_COLUMNS);
+  const y = clamp(toInt(value.y, fallback.y), 1, maxRows);
+  const w = clamp(toInt(value.w, fallback.w), 1, MIRROR_GRID_COLUMNS);
+  const h = clamp(toInt(value.h, fallback.h), 1, maxRows);
 
-  const maxWidth = 13 - x;
+  const maxWidth = MIRROR_GRID_COLUMNS + 1 - x;
+  const maxHeight = maxRows + 1 - y;
 
   return {
     x,
     y,
     w: clamp(w, 1, maxWidth),
-    h,
+    h: clamp(h, 1, maxHeight),
   };
 }
 
-function normalizeClockConfig(value: unknown): ClockModuleConfig {
+function normalizeClockConfig(value: unknown, options?: NormalizeOptions): ClockModuleConfig {
   const fallback = defaultClockConfig();
 
   if (!isRecord(value)) {
@@ -272,12 +299,19 @@ function normalizeClockConfig(value: unknown): ClockModuleConfig {
       typeof value.showSeconds === "boolean"
         ? value.showSeconds
         : fallback.showSeconds,
+    showDate:
+      typeof value.showDate === "boolean"
+        ? value.showDate
+        : fallback.showDate,
     size: value.size === "large" ? "large" : "normal",
-    layout: normalizeLayout("CLOCK", value.layout),
+    layout: normalizeLayout("CLOCK", value.layout, options),
   };
 }
 
-function normalizeWeatherConfig(value: unknown): WeatherModuleConfig {
+function normalizeWeatherConfig(
+  value: unknown,
+  options?: NormalizeOptions,
+): WeatherModuleConfig {
   const fallback = defaultWeatherConfig();
 
   if (!isRecord(value)) {
@@ -298,11 +332,11 @@ function normalizeWeatherConfig(value: unknown): WeatherModuleConfig {
         ? value.showForecast
         : fallback.showForecast,
     forecastDays,
-    layout: normalizeLayout("WEATHER", value.layout),
+    layout: normalizeLayout("WEATHER", value.layout, options),
   };
 }
 
-function normalizeTimersConfig(value: unknown): TimersModuleConfig {
+function normalizeTimersConfig(value: unknown, options?: NormalizeOptions): TimersModuleConfig {
   const fallback = defaultTimersConfig();
 
   if (!isRecord(value)) {
@@ -312,11 +346,14 @@ function normalizeTimersConfig(value: unknown): TimersModuleConfig {
   return {
     maxVisible: clamp(toInt(value.maxVisible, fallback.maxVisible), 1, 20),
     displayMode: value.displayMode === "list" ? "list" : "focus",
-    layout: normalizeLayout("TIMERS", value.layout),
+    layout: normalizeLayout("TIMERS", value.layout, options),
   };
 }
 
-function normalizeCalendarConfig(value: unknown): CalendarModuleConfig {
+function normalizeCalendarConfig(
+  value: unknown,
+  options?: NormalizeOptions,
+): CalendarModuleConfig {
   const fallback = defaultCalendarConfig();
 
   if (!isRecord(value)) {
@@ -340,7 +377,7 @@ function normalizeCalendarConfig(value: unknown): CalendarModuleConfig {
       typeof value.showLocation === "boolean"
         ? value.showLocation
         : fallback.showLocation,
-    layout: normalizeLayout("CALENDAR", value.layout),
+    layout: normalizeLayout("CALENDAR", value.layout, options),
   };
 }
 
@@ -358,7 +395,10 @@ function isValidDateIso(value: string) {
   return date.toISOString().slice(0, 10) === value;
 }
 
-function normalizeAttentionConfig(value: unknown): AttentionModuleConfig {
+function normalizeAttentionConfig(
+  value: unknown,
+  options?: NormalizeOptions,
+): AttentionModuleConfig {
   const fallback = defaultAttentionConfig();
 
   if (!isRecord(value)) {
@@ -406,11 +446,11 @@ function normalizeAttentionConfig(value: unknown): AttentionModuleConfig {
 
   return {
     items: items.slice(0, 20),
-    layout: normalizeLayout("ATTENTION", value.layout),
+    layout: normalizeLayout("ATTENTION", value.layout, options),
   };
 }
 
-function normalizeTodoistConfig(value: unknown): TodoistModuleConfig {
+function normalizeTodoistConfig(value: unknown, options?: NormalizeOptions): TodoistModuleConfig {
   const fallback = defaultTodoistConfig();
 
   if (!isRecord(value)) {
@@ -428,35 +468,36 @@ function normalizeTodoistConfig(value: unknown): TodoistModuleConfig {
         : fallback.projectId,
     maxVisible: clamp(toInt(value.maxVisible, fallback.maxVisible), 1, 30),
     pollSeconds: clamp(toInt(value.pollSeconds, fallback.pollSeconds), 10, 3600),
-    layout: normalizeLayout("TODOIST", value.layout),
+    layout: normalizeLayout("TODOIST", value.layout, options),
   };
 }
 
 export function normalizeModuleConfig<T extends MirrorModuleType>(
   type: T,
   value: unknown,
+  options?: NormalizeOptions,
 ): ModuleConfigByType[T] {
   if (type === "CLOCK") {
-    return normalizeClockConfig(value) as ModuleConfigByType[T];
+    return normalizeClockConfig(value, options) as ModuleConfigByType[T];
   }
 
   if (type === "WEATHER") {
-    return normalizeWeatherConfig(value) as ModuleConfigByType[T];
+    return normalizeWeatherConfig(value, options) as ModuleConfigByType[T];
   }
 
   if (type === "TIMERS") {
-    return normalizeTimersConfig(value) as ModuleConfigByType[T];
+    return normalizeTimersConfig(value, options) as ModuleConfigByType[T];
   }
 
   if (type === "CALENDAR") {
-    return normalizeCalendarConfig(value) as ModuleConfigByType[T];
+    return normalizeCalendarConfig(value, options) as ModuleConfigByType[T];
   }
 
   if (type === "ATTENTION") {
-    return normalizeAttentionConfig(value) as ModuleConfigByType[T];
+    return normalizeAttentionConfig(value, options) as ModuleConfigByType[T];
   }
 
-  return normalizeTodoistConfig(value) as ModuleConfigByType[T];
+  return normalizeTodoistConfig(value, options) as ModuleConfigByType[T];
 }
 
 function tryParseJson(input: string | null): unknown {
@@ -474,12 +515,14 @@ function tryParseJson(input: string | null): unknown {
 export function readModuleConfig<T extends MirrorModuleType>(
   type: T,
   input: string | null,
+  options?: NormalizeOptions,
 ): ModuleConfigByType[T] {
-  return normalizeModuleConfig(type, tryParseJson(input));
+  return normalizeModuleConfig(type, tryParseJson(input), options);
 }
 
 export function buildModuleSettingsMap(
   modules: Array<{ type: string; enabled: boolean; config: string | null }>,
+  options?: NormalizeOptions,
 ): ModuleSettingsMap {
   const byType = new Map(modules.map((module) => [module.type, module]));
 
@@ -493,27 +536,27 @@ export function buildModuleSettingsMap(
   return {
     CLOCK: {
       enabled: clock?.enabled ?? true,
-      config: readModuleConfig("CLOCK", clock?.config ?? null),
+      config: readModuleConfig("CLOCK", clock?.config ?? null, options),
     },
     WEATHER: {
       enabled: weather?.enabled ?? true,
-      config: readModuleConfig("WEATHER", weather?.config ?? null),
+      config: readModuleConfig("WEATHER", weather?.config ?? null, options),
     },
     TIMERS: {
       enabled: timers?.enabled ?? true,
-      config: readModuleConfig("TIMERS", timers?.config ?? null),
+      config: readModuleConfig("TIMERS", timers?.config ?? null, options),
     },
     CALENDAR: {
       enabled: calendar?.enabled ?? false,
-      config: readModuleConfig("CALENDAR", calendar?.config ?? null),
+      config: readModuleConfig("CALENDAR", calendar?.config ?? null, options),
     },
     ATTENTION: {
       enabled: attention?.enabled ?? true,
-      config: readModuleConfig("ATTENTION", attention?.config ?? null),
+      config: readModuleConfig("ATTENTION", attention?.config ?? null, options),
     },
     TODOIST: {
       enabled: todoist?.enabled ?? false,
-      config: readModuleConfig("TODOIST", todoist?.config ?? null),
+      config: readModuleConfig("TODOIST", todoist?.config ?? null, options),
     },
   };
 }

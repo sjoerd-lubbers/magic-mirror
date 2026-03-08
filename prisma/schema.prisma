@@ -100,6 +100,8 @@ model Mirror {
   name         String
   status       MirrorStatus  @default(UNKNOWN)
   highContrastMonochrome Boolean @default(false)
+  showAlignmentGrid Boolean @default(false)
+  gridRows     Int           @default(12)
   locationName String?
   latitude     Float?
   longitude    Float?
