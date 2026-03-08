@@ -254,6 +254,37 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+.pairing-panel {
+  width: 100%;
+}
+
+.pairing-qr-wrap {
+  display: grid;
+  justify-items: center;
+}
+
+.pair-link-disclosure {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: rgba(5, 20, 23, 0.45);
+  padding: 0.55rem 0.65rem;
+}
+
+.pair-link-disclosure summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pair-link-text {
+  margin-top: 0.45rem;
+  line-height: 1.35;
+  word-break: break-all;
+  font-family: "SFMono-Regular", Menlo, monospace;
+  font-size: 0.9rem;
+}
+
 .pair-code {
   font-family: "SFMono-Regular", Menlo, monospace;
   font-size: clamp(2rem, 7vw, 2.8rem);

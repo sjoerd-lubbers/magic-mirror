@@ -165,15 +165,20 @@ export function MirrorRegisterClient() {
       {busy ? <p className="muted">QR-code laden...</p> : null}
 
       {!busy && qrDataUrl ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrDataUrl} alt="QR voor spiegel koppeling" className="qr-image" />
-          <p className="muted">{pairUrl}</p>
+        <div className="pairing-panel stack-small">
+          <div className="pairing-qr-wrap">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrDataUrl} alt="QR voor spiegel koppeling" className="qr-image" />
+          </div>
+          <details className="pair-link-disclosure">
+            <summary>Toon koppel-link</summary>
+            <p className="muted pair-link-text">{pairUrl}</p>
+          </details>
           {expiresAtLabel ? (
             <p className="muted">Deze sessie is geldig tot {expiresAtLabel}.</p>
           ) : null}
           <p className="muted">Na bevestiging op je telefoon gaat deze spiegel automatisch verder.</p>
-        </>
+        </div>
       ) : null}
 
       {activating ? <p className="notice success">Koppeling ontvangen. Spiegel wordt geopend...</p> : null}
