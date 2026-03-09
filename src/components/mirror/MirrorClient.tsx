@@ -661,7 +661,13 @@ export function MirrorClient({
                       <strong className="weather-current-icon">
                         {weatherIconToEmoji(weatherData.current.icon)}
                       </strong>
-                      <p className="weather-temp">
+                      <p
+                        className={`weather-temp${
+                          moduleSettings.WEATHER.config.currentTempDecimals === 1
+                            ? " weather-temp-has-decimals"
+                            : ""
+                        }`}
+                      >
                         <span className="weather-temp-value">
                           {formatCurrentTemperature(
                             weatherData.current.temperatureC,

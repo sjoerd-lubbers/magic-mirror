@@ -928,6 +928,7 @@ button:disabled {
   gap: 0.06em;
   font-weight: 700;
   line-height: 0.95;
+  white-space: nowrap;
 }
 
 .weather-temp-value {
@@ -942,11 +943,15 @@ button:disabled {
 }
 
 .mirror-widget.widget-weather .weather-temp-value {
-  font-size: clamp(4.8rem, min(40cqi, 58cqb), 12.8rem);
+  font-size: clamp(3.2rem, min(30cqi, 44cqb), 9.8rem);
+}
+
+.mirror-widget.widget-weather .weather-temp.weather-temp-has-decimals .weather-temp-value {
+  font-size: clamp(2.8rem, min(26cqi, 38cqb), 8.2rem);
 }
 
 .mirror-widget.widget-weather .weather-temp-unit {
-  font-size: clamp(1.2rem, min(10.5cqi, 15cqb), 2.4rem);
+  font-size: clamp(1rem, min(8.2cqi, 12cqb), 1.9rem);
 }
 
 .weather-current {
@@ -960,12 +965,14 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.48rem;
-  width: 100%;
+  gap: 0.34rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 .weather-current-icon {
-  font-size: clamp(3.6rem, min(30cqi, 44cqb), 10.2rem);
+  font-size: clamp(2.5rem, min(22cqi, 34cqb), 7.2rem);
   line-height: 1;
 }
 
