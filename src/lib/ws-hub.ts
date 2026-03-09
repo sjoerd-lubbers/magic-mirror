@@ -1,21 +1,28 @@
 import type { IncomingMessage } from "http";
 import type { Socket } from "net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { prisma } from "@/lib/prisma";
+
+type TimerPayload = {
+  id: string;
+  label: string | null;
+  durationSeconds: number;
+  endsAt: string;
+  greetingName: string | null;
+};
 
 type MirrorEvent =
   | {
       type: "timer_created";
-      timer: {
-        id: string;
-        label: string | null;
-        durationSeconds: number;
-        endsAt: string;
-        greetingName: string | null;
-      };
+      timer: TimerPayload;
     }
   | {
       type: "timer_canceled";
       timerId: string;
+    }
+  | {
+      type: "timers_snapshot";
+      timers: TimerPayload[];
     }
   | {
       type: "module_updated";
@@ -82,11 +89,68 @@ function onMessage(client: ConnectedClient, rawMessage: string) {
     client.socket.send(
       JSON.stringify({ type: "subscribed", mirrorId: event.mirrorId }),
     );
+    void sendTimersSnapshot(client, event.mirrorId).catch((error) => {
+      console.error("WS timers snapshot mislukt", {
+        clientId: client.id,
+        mirrorId: event.mirrorId,
+        error,
+      });
+    });
     console.info("WS client subscribed", {
       clientId: client.id,
       mirrorId: event.mirrorId,
     });
   }
+
+  if (event.type === "refresh_timers" && client.mirrorId) {
+    void sendTimersSnapshot(client, client.mirrorId).catch((error) => {
+      console.error("WS refresh timers snapshot mislukt", {
+        clientId: client.id,
+        mirrorId: client.mirrorId,
+        error,
+      });
+    });
+  }
+}
+
+async function sendTimersSnapshot(client: ConnectedClient, mirrorId: string) {
+  const timers = await prisma.timer.findMany({
+    where: {
+      mirrorId,
+      status: "ACTIVE",
+      endsAt: {
+        gt: new Date(),
+      },
+    },
+    orderBy: {
+      endsAt: "asc",
+    },
+    take: 50,
+    select: {
+      id: true,
+      label: true,
+      durationSeconds: true,
+      endsAt: true,
+      greetingName: true,
+    },
+  });
+
+  if (client.socket.readyState !== client.socket.OPEN || client.mirrorId !== mirrorId) {
+    return;
+  }
+
+  client.socket.send(
+    JSON.stringify({
+      type: "timers_snapshot",
+      timers: timers.map((timer) => ({
+        id: timer.id,
+        label: timer.label,
+        durationSeconds: timer.durationSeconds,
+        endsAt: timer.endsAt.toISOString(),
+        greetingName: timer.greetingName,
+      })),
+    }),
+  );
 }
 
 export function attachWebSocketServer(server: {

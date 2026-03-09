@@ -372,6 +372,7 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
 
       setRunningTimers((current) => current.filter((timer) => timer.id !== timerId));
       setStatus("Timer geannuleerd.");
+      await loadRunningTimers();
     } catch {
       setError("Timer annuleren mislukt");
     } finally {

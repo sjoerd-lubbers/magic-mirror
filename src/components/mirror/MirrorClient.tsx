@@ -240,6 +240,7 @@ export function MirrorClient({
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     let socket: WebSocket | null = null;
     let reconnectTimeout: number | null = null;
+    let refreshTimersInterval: number | null = null;
     let closedByCleanup = false;
 
     const connect = () => {
@@ -248,6 +249,11 @@ export function MirrorClient({
       socket.addEventListener("open", () => {
         setHasWsSubscription(false);
         socket?.send(JSON.stringify({ type: "subscribe", mirrorId }));
+        refreshTimersInterval = window.setInterval(() => {
+          if (socket?.readyState === socket?.OPEN) {
+            socket.send(JSON.stringify({ type: "refresh_timers" }));
+          }
+        }, 8000);
       });
 
       socket.addEventListener("message", (event) => {
@@ -265,6 +271,7 @@ export function MirrorClient({
                 showAlignmentGrid?: boolean;
                 gridRows?: number;
               };
+              timers?: TimerView[];
               timerId?: string;
               mirrorId?: string;
             }
@@ -284,6 +291,7 @@ export function MirrorClient({
               showAlignmentGrid?: boolean;
               gridRows?: number;
             };
+            timers?: TimerView[];
             timerId?: string;
             mirrorId?: string;
           };
@@ -297,6 +305,17 @@ export function MirrorClient({
 
         if (payload?.type === "timer_created" && payload.timer) {
           setTimers((current) => [payload.timer as TimerView, ...current]);
+        }
+
+        if (payload?.type === "timers_snapshot" && Array.isArray(payload.timers)) {
+          const normalizedTimers = payload.timers as TimerView[];
+          const timerIds = new Set(normalizedTimers.map((timer) => timer.id));
+          for (const announcedId of announcedIdsRef.current) {
+            if (!timerIds.has(announcedId)) {
+              announcedIdsRef.current.delete(announcedId);
+            }
+          }
+          setTimers(normalizedTimers);
         }
 
         if (payload?.type === "timer_canceled" && typeof payload.timerId === "string") {
@@ -346,6 +365,10 @@ export function MirrorClient({
 
       socket.addEventListener("close", () => {
         setHasWsSubscription(false);
+        if (refreshTimersInterval) {
+          window.clearInterval(refreshTimersInterval);
+          refreshTimersInterval = null;
+        }
 
         if (closedByCleanup) {
           return;
@@ -361,6 +384,9 @@ export function MirrorClient({
       closedByCleanup = true;
       if (reconnectTimeout) {
         window.clearTimeout(reconnectTimeout);
+      }
+      if (refreshTimersInterval) {
+        window.clearInterval(refreshTimersInterval);
       }
       setHasWsSubscription(false);
       socket?.close();
