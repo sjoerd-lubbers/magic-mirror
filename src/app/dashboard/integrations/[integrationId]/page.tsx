@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getCalendarCacheOverview } from "@/lib/calendar";
-import { getOpenWeatherApiKey, getSmtpConfig } from "@/lib/config";
+import { getOpenWeatherApiKey } from "@/lib/config";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
 import {
   clearHouseholdICloudSettings,
@@ -14,8 +14,13 @@ import {
   saveHouseholdTodoistSettings,
 } from "@/lib/household-integrations";
 import { getTodoistCacheOverview } from "@/lib/todoist";
+import {
+  getWeatherCacheOverview,
+  WEATHER_CURRENT_CACHE_SECONDS,
+  WEATHER_FORECAST_CACHE_SECONDS,
+} from "@/lib/weather";
 
-const INTEGRATION_IDS = ["icloud", "todoist", "openweather", "smtp"] as const;
+const INTEGRATION_IDS = ["icloud", "todoist", "openweather"] as const;
 type IntegrationId = (typeof INTEGRATION_IDS)[number];
 const SECRET_MASK = "********";
 
@@ -179,7 +184,6 @@ export default async function DashboardIntegrationDetailPage({
   }
 
   const canManage = membership.role === "OWNER" || user.role === "PLATFORM_ADMIN";
-  const smtp = getSmtpConfig();
   const openWeatherApiKey = getOpenWeatherApiKey();
   const stored = await getHouseholdIntegrationSettings(membership.householdId);
   const [calendar, todoist] = await Promise.all([
@@ -188,6 +192,7 @@ export default async function DashboardIntegrationDetailPage({
   ]);
   const calendarCache = getCalendarCacheOverview(membership.householdId);
   const todoistCache = getTodoistCacheOverview(membership.householdId);
+  const weatherCache = getWeatherCacheOverview();
   const maskedIcloudPassword = calendar.password ? SECRET_MASK : "";
   const maskedTodoistToken = todoist.apiToken ? SECRET_MASK : "";
 
@@ -418,34 +423,78 @@ export default async function DashboardIntegrationDetailPage({
               <h4>Verversing en cache</h4>
               <dl className="integration-diagnostics-list">
                 <div>
-                  <dt>Huidig weer</dt>
-                  <dd>15 min revalidate</dd>
+                  <dt>Huidig weer TTL</dt>
+                  <dd>{WEATHER_CURRENT_CACHE_SECONDS}s</dd>
                 </div>
                 <div>
-                  <dt>Forecast</dt>
-                  <dd>24 uur revalidate</dd>
+                  <dt>Forecast TTL</dt>
+                  <dd>{WEATHER_FORECAST_CACHE_SECONDS}s</dd>
                 </div>
                 <div>
                   <dt>Cache type</dt>
-                  <dd>Next.js fetch-cache</dd>
+                  <dd>Server memory cache</dd>
+                </div>
+                <div>
+                  <dt>Cache entries</dt>
+                  <dd>{weatherCache.entryCount}</dd>
+                </div>
+                <div>
+                  <dt>Actieve entries</dt>
+                  <dd>{weatherCache.activeEntryCount}</dd>
+                </div>
+                <div>
+                  <dt>Requests</dt>
+                  <dd>{weatherCache.requestCount}</dd>
+                </div>
+                <div>
+                  <dt>Huidig weer hits/misses</dt>
+                  <dd>
+                    {weatherCache.currentCacheHits} / {weatherCache.currentCacheMisses}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Forecast hits/misses</dt>
+                  <dd>
+                    {weatherCache.forecastCacheHits} / {weatherCache.forecastCacheMisses}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Laatste current fetch</dt>
+                  <dd>{formatDateTime(weatherCache.latestCurrentFetchAt)}</dd>
+                </div>
+                <div>
+                  <dt>Laatste forecast fetch</dt>
+                  <dd>{formatDateTime(weatherCache.latestForecastFetchAt)}</dd>
+                </div>
+                <div>
+                  <dt>Volgende current expiry</dt>
+                  <dd>{formatDateTime(weatherCache.nextCurrentExpiryAt)}</dd>
+                </div>
+                <div>
+                  <dt>Resterend current</dt>
+                  <dd>
+                    {weatherCache.nextCurrentExpiryInSeconds !== null
+                      ? `${weatherCache.nextCurrentExpiryInSeconds}s`
+                      : "n.v.t."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Volgende forecast expiry</dt>
+                  <dd>{formatDateTime(weatherCache.nextForecastExpiryAt)}</dd>
+                </div>
+                <div>
+                  <dt>Resterend forecast</dt>
+                  <dd>
+                    {weatherCache.nextForecastExpiryInSeconds !== null
+                      ? `${weatherCache.nextForecastExpiryInSeconds}s`
+                      : "n.v.t."}
+                  </dd>
                 </div>
               </dl>
             </div>
           </div>
         ) : null}
 
-        {integrationId === "smtp" ? (
-          <div className="stack-small">
-            <div className="section-header">
-              <strong>SMTP</strong>
-              <span className="status-chip ok">Globaal</span>
-            </div>
-            <p className="muted">
-              Host: {smtp.host}:{smtp.port}
-            </p>
-            <p className="muted">Deze koppeling wordt centraal via .env beheerd.</p>
-          </div>
-        ) : null}
       </section>
     </main>
   );

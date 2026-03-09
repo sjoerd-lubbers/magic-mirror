@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { IntegrationSettingsCopyButton } from "@/components/dashboard/IntegrationSettingsCopyButton";
 import { requireUser } from "@/lib/auth";
-import { getOpenWeatherApiKey, getSmtpConfig } from "@/lib/config";
+import { getOpenWeatherApiKey } from "@/lib/config";
 import { getPrimaryHouseholdForUser } from "@/lib/household";
 import {
   getHouseholdCalendarRuntimeConfig,
@@ -158,7 +158,6 @@ export default async function DashboardIntegrationsPage({
 
   const canManage = membership.role === "OWNER" || user.role === "PLATFORM_ADMIN";
 
-  const smtp = getSmtpConfig();
   const openWeatherApiKey = getOpenWeatherApiKey();
   const calendar = await getHouseholdCalendarRuntimeConfig(membership.householdId);
   const todoist = await getHouseholdTodoistRuntimeConfig(membership.householdId);
@@ -250,12 +249,6 @@ export default async function DashboardIntegrationsPage({
             <span className={`status-chip ${openWeatherApiKey ? "ok" : "warn"}`}>
               {openWeatherApiKey ? "Actief" : "Niet ingesteld"}
             </span>
-          </Link>
-
-          <Link href="/dashboard/integrations/smtp" className="integration-tile">
-            <strong>SMTP</strong>
-            <p className="muted">Inlogcodes per e-mail</p>
-            <span className="status-chip ok">{smtp.host ? "Globaal" : "Onbekend"}</span>
           </Link>
         </div>
       </section>

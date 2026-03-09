@@ -84,8 +84,11 @@ Het product is functioneel als eerste release:
 Er draait geen achtergrond-cron. Data wordt alleen opgehaald als er requests zijn.
 
 - Weer:
-  - huidig weer: `revalidate 900s` (15 min)
-  - forecast: `revalidate 86400s` (24 uur)
+  - server-memory cache
+  - huidig weer TTL: `900s` (15 min)
+  - forecast TTL: `86400s` (24 uur)
+  - mirror client pollt `/api/mirrors/[mirrorId]/weather` elke 60s
+  - polling draait alleen na actieve WS subscribe van die spiegel
 - iCloud agenda:
   - server-memory cache per huishouden/config
   - TTL: `CALENDAR_CACHE_SECONDS` (min 30, standaard 300)
@@ -96,8 +99,8 @@ Er draait geen achtergrond-cron. Data wordt alleen opgehaald als er requests zij
   - polling draait alleen na actieve WS subscribe van die spiegel
 
 Opmerking:
-- Weather en agenda worden als snapshot bij page render opgehaald.
-- Todoist wordt tijdens runtime actief gepolld.
+- Agenda wordt als snapshot bij page render opgehaald.
+- Weather en Todoist worden tijdens runtime actief gepolld.
 
 ## Integratiestrategie
 

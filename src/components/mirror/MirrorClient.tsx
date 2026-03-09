@@ -220,6 +220,7 @@ export function MirrorClient({
   const [timers, setTimers] = useState(initialTimers);
   const [moduleSettings, setModuleSettings] = useState(modules);
   const [todoistData, setTodoistData] = useState(todoist);
+  const [weatherData, setWeatherData] = useState(weather);
   const [isMonochrome, setIsMonochrome] = useState(highContrastMonochrome);
   const [showGrid, setShowGrid] = useState(showAlignmentGrid);
   const [gridRowCount, setGridRowCount] = useState(normalizeGridRows(gridRows));
@@ -364,6 +365,10 @@ export function MirrorClient({
   }, [todoist]);
 
   useEffect(() => {
+    setWeatherData(weather);
+  }, [weather]);
+
+  useEffect(() => {
     setModuleSettings(modules);
   }, [modules]);
 
@@ -425,6 +430,55 @@ export function MirrorClient({
     mirrorId,
     moduleSettings.TODOIST.enabled,
     moduleSettings.TODOIST.config.pollSeconds,
+    hasWsSubscription,
+  ]);
+
+  useEffect(() => {
+    if (!moduleSettings.WEATHER.enabled || !hasWsSubscription) {
+      return;
+    }
+
+    let stopped = false;
+
+    const loadWeather = async () => {
+      const response = await fetch(`/api/mirrors/${mirrorId}/weather`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            weather?: WeatherModuleData | null;
+          }
+        | null;
+
+      if (stopped) {
+        return;
+      }
+
+      setWeatherData(payload?.weather ?? null);
+    };
+
+    const timeout = window.setTimeout(() => {
+      loadWeather().catch(() => undefined);
+    }, 0);
+
+    const interval = window.setInterval(() => {
+      loadWeather().catch(() => undefined);
+    }, 60 * 1000);
+
+    return () => {
+      stopped = true;
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [
+    mirrorId,
+    moduleSettings.WEATHER.enabled,
+    moduleSettings.WEATHER.config.forecastDays,
     hasWsSubscription,
   ]);
 
@@ -599,18 +653,18 @@ export function MirrorClient({
             className="mirror-widget widget-weather"
             style={moduleLayoutStyle(moduleSettings.WEATHER.config.layout)}
           >
-            {weather ? (
+            {weatherData ? (
               <>
-                {moduleSettings.WEATHER.config.showCurrent && weather.current ? (
+                {moduleSettings.WEATHER.config.showCurrent && weatherData.current ? (
                   <div className="weather-current">
                     <div className="weather-current-main">
                       <strong className="weather-current-icon">
-                        {weatherIconToEmoji(weather.current.icon)}
+                        {weatherIconToEmoji(weatherData.current.icon)}
                       </strong>
                       <p className="weather-temp">
                         <span className="weather-temp-value">
                           {formatCurrentTemperature(
-                            weather.current.temperatureC,
+                            weatherData.current.temperatureC,
                             moduleSettings.WEATHER.config.currentTempDecimals,
                           )}
                         </span>
@@ -620,9 +674,9 @@ export function MirrorClient({
                   </div>
                 ) : null}
 
-                {moduleSettings.WEATHER.config.showForecast && weather.forecast.length > 0 ? (
+                {moduleSettings.WEATHER.config.showForecast && weatherData.forecast.length > 0 ? (
                   <ul className="forecast-row">
-                    {weather.forecast
+                    {weatherData.forecast
                       .slice(0, moduleSettings.WEATHER.config.forecastDays)
                       .map((day) => (
                         <li key={day.dateIso} className="forecast-item">
