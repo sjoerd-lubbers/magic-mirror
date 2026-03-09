@@ -1005,6 +1005,13 @@ button:disabled {
   align-items: center;
   padding: 0.45rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 0.6rem;
+}
+
+.timer-row-actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
 }
 
 .timer-focus-screen {
@@ -1021,7 +1028,7 @@ button:disabled {
 
 .timer-focus-screen-clock {
   position: absolute;
-  top: calc(clamp(1.8rem, 5.5vh, 4.4rem) + clamp(3.2rem, 12vw, 9.5rem));
+  top: calc(clamp(1.8rem, 5.5vh, 4.4rem) + (clamp(3.2rem, 12vw, 9.5rem) * 1.5));
   left: 50%;
   transform: translateX(-50%);
   font-size: clamp(3.2rem, 12vw, 9.5rem);

@@ -265,6 +265,7 @@ export function MirrorClient({
                 showAlignmentGrid?: boolean;
                 gridRows?: number;
               };
+              timerId?: string;
               mirrorId?: string;
             }
           | null = null;
@@ -283,6 +284,7 @@ export function MirrorClient({
               showAlignmentGrid?: boolean;
               gridRows?: number;
             };
+            timerId?: string;
             mirrorId?: string;
           };
         } catch {
@@ -295,6 +297,11 @@ export function MirrorClient({
 
         if (payload?.type === "timer_created" && payload.timer) {
           setTimers((current) => [payload.timer as TimerView, ...current]);
+        }
+
+        if (payload?.type === "timer_canceled" && typeof payload.timerId === "string") {
+          setTimers((current) => current.filter((timer) => timer.id !== payload.timerId));
+          announcedIdsRef.current.delete(payload.timerId);
         }
 
         if (

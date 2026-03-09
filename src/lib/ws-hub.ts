@@ -14,6 +14,10 @@ type MirrorEvent =
       };
     }
   | {
+      type: "timer_canceled";
+      timerId: string;
+    }
+  | {
       type: "module_updated";
       module: {
         type: string;

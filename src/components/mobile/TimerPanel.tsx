@@ -102,6 +102,8 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
   const [pushPublicKey, setPushPublicKey] = useState<string | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [showPushSettings, setShowPushSettings] = useState(false);
+  const [cancelingTimerId, setCancelingTimerId] = useState<string | null>(null);
 
   const loadRunningTimers = useCallback(async () => {
     if (!mirrorId) {
@@ -189,8 +191,12 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
   }, []);
 
   useEffect(() => {
+    if (!showPushSettings) {
+      return;
+    }
+
     loadPushState().catch(() => undefined);
-  }, [loadPushState]);
+  }, [loadPushState, showPushSettings]);
 
   async function enablePushNotifications() {
     if (!pushPublicKey || !pushConfigured) {
@@ -342,6 +348,37 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
     }
   }
 
+  async function cancelTimer(timerId: string) {
+    setCancelingTimerId(timerId);
+    setStatus(null);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/timers", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timerId,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(payload?.error ?? "Timer annuleren mislukt");
+        return;
+      }
+
+      setRunningTimers((current) => current.filter((timer) => timer.id !== timerId));
+      setStatus("Timer geannuleerd.");
+    } catch {
+      setError("Timer annuleren mislukt");
+    } finally {
+      setCancelingTimerId(null);
+    }
+  }
+
   const visibleTimers = useMemo(
     () =>
       runningTimers
@@ -407,47 +444,60 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
         <p>Snelle timerbediening.</p>
       </div>
 
-      <section className="card stack-small">
-        <h2>Pushmeldingen</h2>
-        {!pushSupported ? (
-          <p className="muted">Push wordt niet ondersteund in deze browser.</p>
-        ) : !pushConfigured ? (
-          <p className="muted">Push is nog niet geconfigureerd op de server.</p>
-        ) : (
-          <>
-            <p className="muted">Ontvang een melding zodra jouw timer klaar is.</p>
-            <div className="button-row">
-              {pushSubscribed ? (
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={disablePushNotifications}
-                  disabled={pushBusy}
-                >
-                  {pushBusy ? "Bezig..." : "Push uitzetten"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={enablePushNotifications}
-                  disabled={pushBusy}
-                >
-                  {pushBusy ? "Bezig..." : "Push aanzetten"}
-                </button>
-              )}
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={sendTestPush}
-                disabled={pushBusy || !pushSubscribed}
-              >
-                {pushBusy ? "Bezig..." : "Test push"}
-              </button>
-            </div>
-          </>
-        )}
-        {pushStatus ? <p className="notice success">{pushStatus}</p> : null}
-        {pushError ? <p className="notice error">{pushError}</p> : null}
+      <section className="stack-small">
+        <div className="button-row">
+          <button
+            type="button"
+            className="button-secondary button-small"
+            onClick={() => setShowPushSettings((current) => !current)}
+          >
+            {showPushSettings ? "Verberg pushmeldingen" : "Pushmeldingen tonen"}
+          </button>
+        </div>
+        {showPushSettings ? (
+          <section className="card stack-small">
+            <h2>Pushmeldingen</h2>
+            {!pushSupported ? (
+              <p className="muted">Push wordt niet ondersteund in deze browser.</p>
+            ) : !pushConfigured ? (
+              <p className="muted">Push is nog niet geconfigureerd op de server.</p>
+            ) : (
+              <>
+                <p className="muted">Ontvang een melding zodra jouw timer klaar is.</p>
+                <div className="button-row">
+                  {pushSubscribed ? (
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={disablePushNotifications}
+                      disabled={pushBusy}
+                    >
+                      {pushBusy ? "Bezig..." : "Push uitzetten"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={enablePushNotifications}
+                      disabled={pushBusy}
+                    >
+                      {pushBusy ? "Bezig..." : "Push aanzetten"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={sendTestPush}
+                    disabled={pushBusy || !pushSubscribed}
+                  >
+                    {pushBusy ? "Bezig..." : "Test push"}
+                  </button>
+                </div>
+              </>
+            )}
+            {pushStatus ? <p className="notice success">{pushStatus}</p> : null}
+            {pushError ? <p className="notice error">{pushError}</p> : null}
+          </section>
+        ) : null}
       </section>
 
       <form onSubmit={submit} className="stack">
@@ -535,7 +585,17 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
                   <p>{timer.label ?? `Timer ${formatDurationLabel(timer.durationSeconds)}`}</p>
                   <p className="muted">door {timer.requestedBy}</p>
                 </div>
-                <strong>{formatRemaining(timer.endsAt, nowMs)}</strong>
+                <div className="timer-row-actions">
+                  <strong>{formatRemaining(timer.endsAt, nowMs)}</strong>
+                  <button
+                    type="button"
+                    className="button-secondary button-small"
+                    onClick={() => cancelTimer(timer.id)}
+                    disabled={cancelingTimerId === timer.id}
+                  >
+                    {cancelingTimerId === timer.id ? "Bezig..." : "Annuleer"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

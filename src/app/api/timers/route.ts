@@ -26,6 +26,10 @@ const getQuerySchema = z.object({
   mirrorId: z.string().min(1),
 });
 
+const cancelSchema = z.object({
+  timerId: z.string().min(1),
+});
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
 
@@ -145,5 +149,69 @@ export async function POST(request: Request) {
       endsAt: timer.endsAt.toISOString(),
       greetingName: timer.greetingName,
     },
+  });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+  }
+
+  const json = await request.json().catch(() => null);
+  const parsed = cancelSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: "timerId ontbreekt" }, { status: 400 });
+  }
+
+  const timer = await prisma.timer.findUnique({
+    where: { id: parsed.data.timerId },
+    select: {
+      id: true,
+      mirrorId: true,
+      status: true,
+    },
+  });
+
+  if (!timer) {
+    return NextResponse.json({ error: "Timer niet gevonden" }, { status: 404 });
+  }
+
+  const hasAccess = await userCanAccessMirror(user.id, timer.mirrorId);
+
+  if (!hasAccess) {
+    return NextResponse.json({ error: "Geen toegang tot spiegel" }, { status: 403 });
+  }
+
+  if (timer.status !== "ACTIVE") {
+    return NextResponse.json({ error: "Timer is niet meer actief" }, { status: 409 });
+  }
+
+  const canceledAt = new Date();
+  const result = await prisma.timer.updateMany({
+    where: {
+      id: timer.id,
+      status: "ACTIVE",
+    },
+    data: {
+      status: "CANCELED",
+      completedAt: canceledAt,
+    },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Timer is niet meer actief" }, { status: 409 });
+  }
+
+  broadcastToMirror(timer.mirrorId, {
+    type: "timer_canceled",
+    timerId: timer.id,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    timerId: timer.id,
   });
 }
