@@ -1,5 +1,6 @@
 import { createServer } from "http";
 import next from "next";
+import { startTimerCompletionWorker } from "./src/lib/timer-completion-worker";
 import { attachWebSocketServer } from "./src/lib/ws-hub";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -22,6 +23,7 @@ app
 
     server.listen(port, hostname, () => {
       console.log(`Magic Mirror app draait op http://${hostname}:${port}`);
+      startTimerCompletionWorker();
     });
   })
   .catch((error) => {

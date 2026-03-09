@@ -13,6 +13,7 @@ Het product is functioneel als eerste release:
   - nieuwe timers
   - modulewijzigingen
   - spiegelinstellingen (contrast, raster, raster-rijen)
+- Web push notificaties als timer klaar is (optioneel)
 - 1 dashboard app voor mobiel en desktop (responsive navigatie)
 - Prisma migraties + SQLite
 
@@ -22,6 +23,7 @@ Het product is functioneel als eerste release:
 
 - `Spiegels`: overzicht in tegels, beheren per spiegel, scherm koppelen via QR scan
 - `Timers`: mobiele timerbediening met presets + live lopende timers
+  - optioneel pushmeldingen aan/uit per gebruiker/browser
 - `Gezin`: gezinsnaam beheren, leden toevoegen/wijzigen/verwijderen
 - `Integraties`: globale (`.env`) en gezinsspecifieke koppelingen
 - Avatar-menu: profiel, uitloggen
@@ -81,8 +83,6 @@ Het product is functioneel als eerste release:
 
 ## Refresh en cache gedrag
 
-Er draait geen achtergrond-cron. Data wordt alleen opgehaald als er requests zijn.
-
 - Weer:
   - server-memory cache
   - huidig weer TTL: `900s` (15 min)
@@ -97,6 +97,10 @@ Er draait geen achtergrond-cron. Data wordt alleen opgehaald als er requests zij
   - TTL: `TODOIST_CACHE_SECONDS` (min 15, vaak 60..3600)
   - mirror client pollt `/api/mirrors/[mirrorId]/todoist` met module `pollSeconds` (10..3600)
   - polling draait alleen na actieve WS subscribe van die spiegel
+- Timers:
+  - background sweep worker op server (`TIMER_COMPLETION_SWEEP_MS`, standaard 5000ms)
+  - zet verlopen timers op `COMPLETED`
+  - verstuurt optioneel web push naar de gebruiker die de timer heeft gezet
 
 Opmerking:
 - Agenda wordt als snapshot bij page render opgehaald.
@@ -146,6 +150,14 @@ npm install
 ```bash
 cp .env.example .env
 ```
+
+Voor web push in productie: genereer VAPID keys en zet ze in `.env`:
+
+```bash
+npm run push:vapid
+```
+
+Let op: browser push werkt op `https` (of `localhost` in development).
 
 3. Genereer Prisma client:
 
@@ -207,6 +219,11 @@ Zie `.env.example`. Belangrijk:
 - `AUTH_CODE_SECRET`
 - `INTEGRATIONS_ENCRYPTION_KEY`
 - `COOKIE_SECURE` (`false` op HTTP, `true` op HTTPS)
+- Web push:
+  - `WEB_PUSH_VAPID_PUBLIC_KEY`
+  - `WEB_PUSH_VAPID_PRIVATE_KEY`
+  - `WEB_PUSH_VAPID_SUBJECT`
+  - `TIMER_COMPLETION_SWEEP_MS`
 - SMTP:
   - `SMTP_HOST`
   - `SMTP_PORT`
@@ -235,6 +252,7 @@ Zie `.env.example`. Belangrijk:
 - `MirrorClaimSession`
 - `VerificationCode`
 - `Session`
+- `PushSubscription`
 
 ## Troubleshooting
 

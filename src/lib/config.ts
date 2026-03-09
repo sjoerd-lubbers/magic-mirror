@@ -128,3 +128,17 @@ export function getTodoistConfig() {
     cacheSeconds: Number.isFinite(cacheSeconds) ? cacheSeconds : 60,
   };
 }
+
+export function getWebPushConfig() {
+  const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() ?? "";
+  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() ?? "";
+  const subject =
+    process.env.WEB_PUSH_VAPID_SUBJECT?.trim() || "mailto:noreply@magicmirror.local";
+
+  return {
+    publicKey,
+    privateKey,
+    subject,
+    enabled: Boolean(publicKey && privateKey),
+  };
+}

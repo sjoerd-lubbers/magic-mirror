@@ -18,8 +18,54 @@ type RunningTimer = {
   requestedBy: string;
 };
 
+type PushPublicKeyResponse = {
+  enabled?: boolean;
+  publicKey?: string | null;
+};
+
 const PRESET_MINUTES = [3, 6, 10, 15, 20, 25, 30, 40, 50, 60] as const;
 const TEST_PRESET_SECONDS = 10;
+
+function base64UrlToUint8Array(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = window.atob(`${base64}${padding}`);
+  const output = new Uint8Array(raw.length);
+
+  for (let index = 0; index < raw.length; index += 1) {
+    output[index] = raw.charCodeAt(index);
+  }
+
+  return output;
+}
+
+async function getServiceWorkerRegistration() {
+  await navigator.serviceWorker.register("/sw.js");
+  const ready = await navigator.serviceWorker.ready;
+  return ready;
+}
+
+function formatErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Onbekende fout";
+}
+
+function toPushSubscribeHint(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("push service error")) {
+    return "Push service niet bereikbaar. Gebruik bij Brave: zet 'Use Google services for push messaging' aan (brave://settings/privacy). Schakel shields/adblock/VPN kort uit en probeer opnieuw.";
+  }
+
+  if (normalized.includes("notallowederror")) {
+    return "Browser meldingstoestemming is geblokkeerd. Zet notificaties voor localhost op Toestaan.";
+  }
+
+  return message;
+}
 
 function formatRemaining(endsAt: string, nowMs: number) {
   const remainingSeconds = Math.max(
@@ -49,6 +95,13 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [pushSupported, setPushSupported] = useState(true);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushConfigured, setPushConfigured] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushPublicKey, setPushPublicKey] = useState<string | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
 
   const loadRunningTimers = useCallback(async () => {
     if (!mirrorId) {
@@ -95,6 +148,199 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
       window.clearInterval(interval);
     };
   }, [loadRunningTimers]);
+
+  const loadPushState = useCallback(async () => {
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !("Notification" in window)
+    ) {
+      setPushSupported(false);
+      setPushConfigured(false);
+      setPushSubscribed(false);
+      return;
+    }
+
+    const response = await fetch("/api/push/public-key", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      setPushSupported(false);
+      setPushConfigured(false);
+      setPushSubscribed(false);
+      return;
+    }
+
+    const payload = (await response.json().catch(() => null)) as PushPublicKeyResponse | null;
+    const configured = Boolean(payload?.enabled && payload.publicKey);
+    setPushConfigured(configured);
+    setPushPublicKey(payload?.publicKey ?? null);
+
+    if (!configured) {
+      setPushSubscribed(false);
+      return;
+    }
+
+    const registration = await getServiceWorkerRegistration();
+    const existingSubscription = await registration.pushManager.getSubscription();
+    setPushSubscribed(Boolean(existingSubscription));
+  }, []);
+
+  useEffect(() => {
+    loadPushState().catch(() => undefined);
+  }, [loadPushState]);
+
+  async function enablePushNotifications() {
+    if (!pushPublicKey || !pushConfigured) {
+      return;
+    }
+
+    setPushBusy(true);
+    setPushError(null);
+    setPushStatus(null);
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushError("Toon meldingen toestaan in je browser om push te gebruiken.");
+        setPushBusy(false);
+        return;
+      }
+
+      const registration = await getServiceWorkerRegistration();
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToUint8Array(pushPublicKey),
+        });
+      }
+
+      const json = subscription.toJSON();
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+        setPushError("Push subscription kon niet worden opgeslagen.");
+        setPushBusy(false);
+        return;
+      }
+
+      const response = await fetch("/api/push/subscriptions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: {
+            p256dh: json.keys.p256dh,
+            auth: json.keys.auth,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        if (payload?.error) {
+          setPushError(payload.error);
+          setPushBusy(false);
+          return;
+        }
+
+        const responseText = (await response.text().catch(() => "")).trim();
+        setPushError(responseText || `Push activeren mislukt (HTTP ${response.status}).`);
+        setPushBusy(false);
+        return;
+      }
+
+      setPushSubscribed(true);
+    } catch (error) {
+      setPushError(`Push activeren mislukt: ${toPushSubscribeHint(formatErrorMessage(error))}`);
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function disablePushNotifications() {
+    if (!pushSupported) {
+      return;
+    }
+
+    setPushBusy(true);
+    setPushError(null);
+    setPushStatus(null);
+
+    try {
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        await fetch("/api/push/subscriptions", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            endpoint: subscription.endpoint,
+          }),
+        });
+
+        await subscription.unsubscribe().catch(() => undefined);
+      }
+
+      setPushSubscribed(false);
+    } catch (error) {
+      setPushError(`Push uitzetten mislukt: ${formatErrorMessage(error)}`);
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function sendTestPush() {
+    setPushBusy(true);
+    setPushError(null);
+    setPushStatus(null);
+
+    try {
+      const response = await fetch("/api/push/test", {
+        method: "POST",
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            result?: {
+              sent?: number;
+              failed?: number;
+              removed?: number;
+              skipped?: boolean;
+            };
+          }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        setPushError(payload?.error ?? `Test push mislukt (HTTP ${response.status})`);
+        return;
+      }
+
+      const sent = payload.result?.sent ?? 0;
+      const failed = payload.result?.failed ?? 0;
+      const skipped = payload.result?.skipped ?? false;
+
+      if (skipped) {
+        setPushError("Test push overgeslagen: server push-config ontbreekt.");
+        return;
+      }
+
+      setPushStatus(`Test push verstuurd. sent=${sent}, failed=${failed}`);
+    } catch (error) {
+      setPushError(`Test push mislukt: ${formatErrorMessage(error)}`);
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   const visibleTimers = useMemo(
     () =>
@@ -160,6 +406,49 @@ export function TimerPanel({ mirrors }: TimerPanelProps) {
         <h1>Timer zetten</h1>
         <p>Snelle timerbediening.</p>
       </div>
+
+      <section className="card stack-small">
+        <h2>Pushmeldingen</h2>
+        {!pushSupported ? (
+          <p className="muted">Push wordt niet ondersteund in deze browser.</p>
+        ) : !pushConfigured ? (
+          <p className="muted">Push is nog niet geconfigureerd op de server.</p>
+        ) : (
+          <>
+            <p className="muted">Ontvang een melding zodra jouw timer klaar is.</p>
+            <div className="button-row">
+              {pushSubscribed ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={disablePushNotifications}
+                  disabled={pushBusy}
+                >
+                  {pushBusy ? "Bezig..." : "Push uitzetten"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={enablePushNotifications}
+                  disabled={pushBusy}
+                >
+                  {pushBusy ? "Bezig..." : "Push aanzetten"}
+                </button>
+              )}
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={sendTestPush}
+                disabled={pushBusy || !pushSubscribed}
+              >
+                {pushBusy ? "Bezig..." : "Test push"}
+              </button>
+            </div>
+          </>
+        )}
+        {pushStatus ? <p className="notice success">{pushStatus}</p> : null}
+        {pushError ? <p className="notice error">{pushError}</p> : null}
+      </section>
 
       <form onSubmit={submit} className="stack">
         <label>
