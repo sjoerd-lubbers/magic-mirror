@@ -247,11 +247,16 @@ export function MirrorClient({
       socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
 
       socket.addEventListener("open", () => {
+        const activeSocket = socket;
+        if (!activeSocket) {
+          return;
+        }
+
         setHasWsSubscription(false);
-        socket?.send(JSON.stringify({ type: "subscribe", mirrorId }));
+        activeSocket.send(JSON.stringify({ type: "subscribe", mirrorId }));
         refreshTimersInterval = window.setInterval(() => {
-          if (socket?.readyState === socket?.OPEN) {
-            socket.send(JSON.stringify({ type: "refresh_timers" }));
+          if (activeSocket.readyState === activeSocket.OPEN) {
+            activeSocket.send(JSON.stringify({ type: "refresh_timers" }));
           }
         }, 8000);
       });
