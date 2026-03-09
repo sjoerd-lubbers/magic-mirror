@@ -528,9 +528,14 @@ export function MirrorClient({
     (timersDisplayMode !== "focus" || runningTimers.length > 0);
   const timerFocusIsActive =
     moduleSettings.TIMERS.enabled && timersDisplayMode === "focus" && Boolean(activeTimer);
+  const showFocusClock = moduleSettings.TIMERS.config.showClockInFocus;
   const clockText = formatClock(now, {
     hourFormat: moduleSettings.CLOCK.config.hourFormat,
     showSeconds: moduleSettings.CLOCK.config.showSeconds,
+  });
+  const focusClockText = formatClock(now, {
+    hourFormat: moduleSettings.CLOCK.config.hourFormat,
+    showSeconds: false,
   });
   const clockDateText = formatClockDate(now);
   const calendarTitle = moduleSettings.CALENDAR.config.title.trim();
@@ -563,6 +568,9 @@ export function MirrorClient({
         className={`mirror-screen mirror-screen-focus${isMonochrome ? " mirror-screen-monochrome" : ""}`}
       >
         <section className="timer-focus-screen">
+          {showFocusClock ? (
+            <p className="timer-focus-screen-clock">{focusClockText}</p>
+          ) : null}
           <p className="timer-focus-screen-label">
             {activeTimer.label ?? `Timer ${formatTimerLabel(activeTimer.durationSeconds)}`}
           </p>

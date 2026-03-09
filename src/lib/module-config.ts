@@ -37,6 +37,7 @@ export type WeatherModuleConfig = {
 export type TimersModuleConfig = {
   maxVisible: number;
   displayMode: "focus" | "list";
+  showClockInFocus: boolean;
   layout: ModuleLayout;
 };
 
@@ -165,6 +166,7 @@ function defaultTimersConfig(): TimersModuleConfig {
   return {
     maxVisible: 6,
     displayMode: "focus",
+    showClockInFocus: false,
     layout: defaultLayout("TIMERS"),
   };
 }
@@ -354,6 +356,10 @@ function normalizeTimersConfig(value: unknown, options?: NormalizeOptions): Time
   return {
     maxVisible: clamp(toInt(value.maxVisible, fallback.maxVisible), 1, 20),
     displayMode: value.displayMode === "list" ? "list" : "focus",
+    showClockInFocus:
+      typeof value.showClockInFocus === "boolean"
+        ? value.showClockInFocus
+        : fallback.showClockInFocus,
     layout: normalizeLayout("TIMERS", value.layout, options),
   };
 }

@@ -1015,6 +1015,22 @@ button:disabled {
   justify-items: center;
   align-content: center;
   background: radial-gradient(circle at 40% 40%, #1a3f4a, #09171b 65%);
+  padding: clamp(1.2rem, 3vw, 2.8rem) 1rem 1rem;
+  position: relative;
+}
+
+.timer-focus-screen-clock {
+  position: absolute;
+  top: calc(clamp(1.8rem, 5.5vh, 4.4rem) + clamp(3.2rem, 12vw, 9.5rem));
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(3.2rem, 12vw, 9.5rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.96;
 }
 
 .timer-focus-screen-label {

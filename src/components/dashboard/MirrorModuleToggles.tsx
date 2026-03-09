@@ -569,6 +569,20 @@ function TimerSettings({
         />
       </label>
 
+      <label className="inline-checkbox">
+        <input
+          type="checkbox"
+          checked={config.showClockInFocus}
+          onChange={(event) =>
+            onChange({
+              ...config,
+              showClockInFocus: event.target.checked,
+            })
+          }
+        />
+        <span>Toon grote klok in focusmodus</span>
+      </label>
+
       <LayoutEditor
         layout={config.layout}
         gridRows={gridRows}
