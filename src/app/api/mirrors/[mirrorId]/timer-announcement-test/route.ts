@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { userCanAccessMirror } from "@/lib/household";
-import {
-  TIMER_ANNOUNCEMENT_TEST_MESSAGE,
-  buildTimerAnnouncementAudioKey,
-  prepareTimerAnnouncementAudio,
-} from "@/lib/timer-announcement-audio";
+import { buildTimerAnnouncementAudioKey } from "@/lib/timer-announcement-key";
+import { TIMER_ANNOUNCEMENT_TEST_MESSAGE } from "@/lib/timer-announcement";
+import { prepareTimerAnnouncementAudio } from "@/lib/timer-announcement-audio";
 import { broadcastToMirror, getMirrorSubscriberCount } from "@/lib/ws-hub";
 
 export const runtime = "nodejs";

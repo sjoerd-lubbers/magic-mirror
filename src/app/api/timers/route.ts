@@ -3,11 +3,9 @@ import { z } from "zod";
 import { buildGreetingName, getCurrentUser } from "@/lib/auth";
 import { userCanAccessMirror } from "@/lib/household";
 import { prisma } from "@/lib/prisma";
-import {
-  buildTimerAnnouncementAudioKey,
-  buildTimerAnnouncementMessage,
-  prepareTimerAnnouncementAudio,
-} from "@/lib/timer-announcement-audio";
+import { buildTimerAnnouncementAudioKey } from "@/lib/timer-announcement-key";
+import { buildTimerAnnouncementMessage } from "@/lib/timer-announcement";
+import { prepareTimerAnnouncementAudio } from "@/lib/timer-announcement-audio";
 import { cleanupExpiredActiveTimers } from "@/lib/timers";
 import { broadcastToMirror } from "@/lib/ws-hub";
 

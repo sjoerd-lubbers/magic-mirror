@@ -1,15 +1,12 @@
-import crypto from "crypto";
+import "server-only";
 import { execFile } from "child_process";
 import { mkdir, readFile, rename, rm, stat } from "fs/promises";
 import path from "path";
 import { promisify } from "util";
+import { buildTimerAnnouncementAudioKey } from "@/lib/timer-announcement-key";
 
 const execFileAsync = promisify(execFile);
-
-const TIMER_TTS_VOICE_ID = "espeak-ng:nl:145:ffmpeg-mp3:v1";
 const DEFAULT_CACHE_DIR = path.join("/tmp", "magic-mirror", "timer-announcements");
-export const TIMER_ANNOUNCEMENT_TEST_MESSAGE =
-  "Dit is een test van het timer meldvolume.";
 
 function normalizeMessage(message: string) {
   return message.trim().replace(/\s+/g, " ").slice(0, 200);
@@ -26,38 +23,6 @@ function timerAnnouncementAudioPath(key: string) {
 
 export function isValidTimerAnnouncementAudioKey(key: string) {
   return /^[a-f0-9]{64}$/.test(key);
-}
-
-export function buildTimerAnnouncementAudioUrl(key: string) {
-  return `/api/timer-announcements/${encodeURIComponent(key)}`;
-}
-
-export function formatTimerAnnouncementDurationLabel(durationSeconds: number) {
-  if (durationSeconds < 60) {
-    return `${durationSeconds} seconden`;
-  }
-
-  return `${Math.round(durationSeconds / 60)} minuten`;
-}
-
-export function buildTimerAnnouncementMessage({
-  greetingName,
-  durationSeconds,
-}: {
-  greetingName: string | null;
-  durationSeconds: number;
-}) {
-  const safeGreetingName = greetingName?.trim() || "daar";
-  const durationLabel = formatTimerAnnouncementDurationLabel(durationSeconds);
-  return `Hoi ${safeGreetingName}, de timer van ${durationLabel} is klaar.`;
-}
-
-export function buildTimerAnnouncementAudioKey(message: string) {
-  const normalized = normalizeMessage(message);
-  return crypto
-    .createHash("sha256")
-    .update(`${TIMER_TTS_VOICE_ID}:${normalized}`)
-    .digest("hex");
 }
 
 export async function prepareTimerAnnouncementAudio(message: string) {

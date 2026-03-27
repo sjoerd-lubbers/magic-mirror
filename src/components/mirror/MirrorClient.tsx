@@ -13,7 +13,7 @@ import {
 import {
   TIMER_ANNOUNCEMENT_TEST_MESSAGE,
   buildTimerAnnouncementAudioUrl,
-} from "@/lib/timer-announcement-audio";
+} from "@/lib/timer-announcement";
 import type { TodoistModuleData } from "@/lib/todoist";
 import type { WeatherModuleData } from "@/lib/weather";
 

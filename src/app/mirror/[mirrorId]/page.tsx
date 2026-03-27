@@ -3,10 +3,8 @@ import { MirrorClient } from "@/components/mirror/MirrorClient";
 import { getCalendarModuleData } from "@/lib/calendar";
 import { buildModuleSettingsMap } from "@/lib/module-config";
 import { prisma } from "@/lib/prisma";
-import {
-  buildTimerAnnouncementAudioKey,
-  buildTimerAnnouncementMessage,
-} from "@/lib/timer-announcement-audio";
+import { buildTimerAnnouncementAudioKey } from "@/lib/timer-announcement-key";
+import { buildTimerAnnouncementMessage } from "@/lib/timer-announcement";
 import { getTodoistModuleData } from "@/lib/todoist";
 import { cleanupExpiredActiveTimers } from "@/lib/timers";
 import { getWeatherModuleData } from "@/lib/weather";

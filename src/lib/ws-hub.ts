@@ -2,10 +2,8 @@ import type { IncomingMessage } from "http";
 import type { Socket } from "net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { prisma } from "@/lib/prisma";
-import {
-  buildTimerAnnouncementAudioKey,
-  buildTimerAnnouncementMessage,
-} from "@/lib/timer-announcement-audio";
+import { buildTimerAnnouncementAudioKey } from "@/lib/timer-announcement-key";
+import { buildTimerAnnouncementMessage } from "@/lib/timer-announcement";
 
 type TimerPayload = {
   id: string;
