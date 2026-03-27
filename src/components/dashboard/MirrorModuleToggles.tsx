@@ -655,8 +655,23 @@ function TimerSettings({
         <span>{config.announcementVolume}%</span>
       </label>
 
+      <label className="inline-checkbox">
+        <input
+          type="checkbox"
+          checked={config.playCompletionTone}
+          onChange={(event) =>
+            onChange({
+              ...config,
+              playCompletionTone: event.target.checked,
+            })
+          }
+        />
+        <span>Speel extra alarmtoon bij einde timer</span>
+      </label>
+
       <p className="muted">
-        Gebruik &apos;Test melding&apos; om dit volume direct op de spiegel te horen.
+        Gebruik &apos;Test melding&apos; om het huidige volume direct op de spiegel te horen.
+        Voor toon aan of uit eerst even opslaan.
       </p>
 
       <LayoutEditor

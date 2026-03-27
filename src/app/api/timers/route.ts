@@ -3,6 +3,11 @@ import { z } from "zod";
 import { buildGreetingName, getCurrentUser } from "@/lib/auth";
 import { userCanAccessMirror } from "@/lib/household";
 import { prisma } from "@/lib/prisma";
+import {
+  buildTimerAnnouncementAudioKey,
+  buildTimerAnnouncementMessage,
+  prepareTimerAnnouncementAudio,
+} from "@/lib/timer-announcement-audio";
 import { cleanupExpiredActiveTimers } from "@/lib/timers";
 import { broadcastToMirror } from "@/lib/ws-hub";
 
@@ -85,6 +90,12 @@ export async function GET(request: Request) {
       durationSeconds: timer.durationSeconds,
       endsAt: timer.endsAt.toISOString(),
       greetingName: timer.greetingName,
+      announcementAudioKey: buildTimerAnnouncementAudioKey(
+        buildTimerAnnouncementMessage({
+          greetingName: timer.greetingName,
+          durationSeconds: timer.durationSeconds,
+        }),
+      ),
       requestedBy: timer.requestedBy.displayName ?? timer.requestedBy.email,
     })),
   });
@@ -129,6 +140,21 @@ export async function POST(request: Request) {
     },
   });
 
+  const announcementMessage = buildTimerAnnouncementMessage({
+    greetingName: timer.greetingName,
+    durationSeconds: timer.durationSeconds,
+  });
+  const announcementAudioKey = buildTimerAnnouncementAudioKey(announcementMessage);
+
+  try {
+    await prepareTimerAnnouncementAudio(announcementMessage);
+  } catch (error) {
+    console.error("Timer announcement audio voorbereiden mislukt", {
+      timerId: timer.id,
+      error,
+    });
+  }
+
   broadcastToMirror(mirrorId, {
     type: "timer_created",
     timer: {
@@ -137,6 +163,7 @@ export async function POST(request: Request) {
       durationSeconds: timer.durationSeconds,
       endsAt: timer.endsAt.toISOString(),
       greetingName: timer.greetingName,
+      announcementAudioKey,
     },
   });
 
@@ -148,6 +175,7 @@ export async function POST(request: Request) {
       durationSeconds: timer.durationSeconds,
       endsAt: timer.endsAt.toISOString(),
       greetingName: timer.greetingName,
+      announcementAudioKey,
     },
   });
 }

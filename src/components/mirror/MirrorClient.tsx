@@ -10,6 +10,10 @@ import {
   type MirrorModuleType,
   type ModuleSettingsMap,
 } from "@/lib/module-config";
+import {
+  TIMER_ANNOUNCEMENT_TEST_MESSAGE,
+  buildTimerAnnouncementAudioUrl,
+} from "@/lib/timer-announcement-audio";
 import type { TodoistModuleData } from "@/lib/todoist";
 import type { WeatherModuleData } from "@/lib/weather";
 
@@ -19,7 +23,160 @@ type TimerView = {
   durationSeconds: number;
   endsAt: string;
   greetingName: string | null;
+  announcementAudioKey: string;
 };
+
+let activeAnnouncementAudio: HTMLAudioElement | null = null;
+let activeAnnouncementAudioUrl: string | null = null;
+
+function getAudioContextConstructor() {
+  if ("AudioContext" in window) {
+    return window.AudioContext;
+  }
+
+  const webkitAudioContext = (
+    window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }
+  ).webkitAudioContext;
+
+  return webkitAudioContext ?? null;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function playTimerCompletionTone(announcementVolumePercent: number) {
+  const announcementVolume = Math.max(0, Math.min(1, announcementVolumePercent / 100));
+
+  if (announcementVolume <= 0) {
+    return;
+  }
+
+  const AudioContextConstructor = getAudioContextConstructor();
+
+  if (!AudioContextConstructor) {
+    return;
+  }
+
+  const audioContext = new AudioContextConstructor();
+
+  try {
+    await audioContext.resume();
+
+    const startTime = audioContext.currentTime + 0.04;
+    const masterGain = audioContext.createGain();
+    masterGain.connect(audioContext.destination);
+    masterGain.gain.setValueAtTime(0.0001, startTime);
+    masterGain.gain.exponentialRampToValueAtTime(
+      Math.max(0.0001, announcementVolume * 0.18),
+      startTime + 0.08,
+    );
+    masterGain.gain.exponentialRampToValueAtTime(
+      Math.max(0.0001, announcementVolume * 0.1),
+      startTime + 0.7,
+    );
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 1.4);
+
+    const notes = [
+      { frequency: 523.25, offset: 0, duration: 0.24 },
+      { frequency: 659.25, offset: 0.16, duration: 0.26 },
+      { frequency: 783.99, offset: 0.34, duration: 0.3 },
+      { frequency: 1046.5, offset: 0.56, duration: 0.52 },
+    ];
+
+    for (const note of notes) {
+      const noteStart = startTime + note.offset;
+      const noteEnd = noteStart + note.duration;
+      const voiceGain = audioContext.createGain();
+      voiceGain.connect(masterGain);
+      voiceGain.gain.setValueAtTime(0.0001, noteStart);
+      voiceGain.gain.exponentialRampToValueAtTime(0.85, noteStart + 0.04);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+      const primary = audioContext.createOscillator();
+      primary.type = "triangle";
+      primary.frequency.setValueAtTime(note.frequency, noteStart);
+      primary.connect(voiceGain);
+      primary.start(noteStart);
+      primary.stop(noteEnd);
+
+      const shimmer = audioContext.createOscillator();
+      shimmer.type = "sine";
+      shimmer.frequency.setValueAtTime(note.frequency * 2, noteStart);
+      shimmer.connect(voiceGain);
+      shimmer.start(noteStart);
+      shimmer.stop(noteEnd - 0.02);
+    }
+
+    await delay(1500);
+    await audioContext.close().catch(() => undefined);
+  } catch {
+    void audioContext.close().catch(() => undefined);
+  }
+}
+
+function resetActiveAnnouncementAudio() {
+  if (activeAnnouncementAudio) {
+    activeAnnouncementAudio.pause();
+    activeAnnouncementAudio.currentTime = 0;
+    activeAnnouncementAudio = null;
+  }
+
+  if (activeAnnouncementAudioUrl) {
+    URL.revokeObjectURL(activeAnnouncementAudioUrl);
+    activeAnnouncementAudioUrl = null;
+  }
+}
+
+async function playPreparedAnnouncementAudio(
+  announcementAudioKey: string,
+  announcementVolumePercent: number,
+) {
+  const announcementVolume = Math.max(0, Math.min(1, announcementVolumePercent / 100));
+
+  if (announcementVolume <= 0) {
+    return false;
+  }
+
+  const response = await fetch(buildTimerAnnouncementAudioUrl(announcementAudioKey), {
+    cache: "force-cache",
+  });
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const audio = new Audio(objectUrl);
+  audio.volume = announcementVolume;
+  audio.preload = "auto";
+
+  resetActiveAnnouncementAudio();
+  activeAnnouncementAudio = audio;
+  activeAnnouncementAudioUrl = objectUrl;
+
+  audio.addEventListener(
+    "ended",
+    () => {
+      if (activeAnnouncementAudio === audio) {
+        resetActiveAnnouncementAudio();
+      }
+    },
+    { once: true },
+  );
+
+  try {
+    await audio.play();
+    return true;
+  } catch {
+    if (activeAnnouncementAudio === audio) {
+      resetActiveAnnouncementAudio();
+    }
+
+    return false;
+  }
+}
 
 function speakDutchTimerAnnouncement(message: string, announcementVolumePercent: number) {
   if (!("speechSynthesis" in window)) {
@@ -36,6 +193,35 @@ function speakDutchTimerAnnouncement(message: string, announcementVolumePercent:
   utterance.lang = "nl-NL";
   utterance.volume = announcementVolume;
   window.speechSynthesis.speak(utterance);
+}
+
+async function announceTimerCompletion({
+  message,
+  announcementVolumePercent,
+  playCompletionTone,
+  announcementAudioKey,
+}: {
+  message: string;
+  announcementVolumePercent: number;
+  playCompletionTone: boolean;
+  announcementAudioKey: string | null;
+}) {
+  if (playCompletionTone) {
+    await playTimerCompletionTone(announcementVolumePercent);
+  }
+
+  if (announcementAudioKey) {
+    const started = await playPreparedAnnouncementAudio(
+      announcementAudioKey,
+      announcementVolumePercent,
+    );
+
+    if (started) {
+      return;
+    }
+  }
+
+  speakDutchTimerAnnouncement(message, announcementVolumePercent);
 }
 
 type MirrorClientProps = {
@@ -243,6 +429,9 @@ export function MirrorClient({
   const [gridRowCount, setGridRowCount] = useState(normalizeGridRows(gridRows));
   const [hasWsSubscription, setHasWsSubscription] = useState(false);
   const announcedIdsRef = useRef(new Set<string>());
+  const timerAnnouncementConfigRef = useRef({
+    playCompletionTone: modules.TIMERS.config.playCompletionTone,
+  });
 
   useEffect(() => {
     window.localStorage.setItem(MIRROR_ID_STORAGE_KEY, mirrorId);
@@ -252,6 +441,8 @@ export function MirrorClient({
     const interval = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => () => resetActiveAnnouncementAudio(), []);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
@@ -297,6 +488,7 @@ export function MirrorClient({
               timerId?: string;
               mirrorId?: string;
               announcementVolume?: number;
+              announcementAudioKey?: string | null;
             }
           | null = null;
 
@@ -318,6 +510,7 @@ export function MirrorClient({
             timerId?: string;
             mirrorId?: string;
             announcementVolume?: number;
+            announcementAudioKey?: string | null;
           };
         } catch {
           payload = null;
@@ -351,10 +544,15 @@ export function MirrorClient({
           payload?.type === "timer_announcement_test" &&
           typeof payload.announcementVolume === "number"
         ) {
-          speakDutchTimerAnnouncement(
-            "Dit is een test van het timer meldvolume.",
-            payload.announcementVolume,
-          );
+          void announceTimerCompletion({
+            message: TIMER_ANNOUNCEMENT_TEST_MESSAGE,
+            announcementVolumePercent: payload.announcementVolume,
+            playCompletionTone: timerAnnouncementConfigRef.current.playCompletionTone,
+            announcementAudioKey:
+              typeof payload.announcementAudioKey === "string"
+                ? payload.announcementAudioKey
+                : null,
+          });
         }
 
         if (
@@ -438,6 +636,12 @@ export function MirrorClient({
   useEffect(() => {
     setModuleSettings(modules);
   }, [modules]);
+
+  useEffect(() => {
+    timerAnnouncementConfigRef.current = {
+      playCompletionTone: moduleSettings.TIMERS.config.playCompletionTone,
+    };
+  }, [moduleSettings.TIMERS.config.playCompletionTone]);
 
   useEffect(() => {
     setIsMonochrome(highContrastMonochrome);
@@ -567,9 +771,19 @@ export function MirrorClient({
           ? `${timer.durationSeconds} seconden`
           : `${Math.round(timer.durationSeconds / 60)} minuten`;
       const message = `Hoi ${greetingName}, de timer van ${durationLabel} is klaar.`;
-      speakDutchTimerAnnouncement(message, moduleSettings.TIMERS.config.announcementVolume);
+      void announceTimerCompletion({
+        message,
+        announcementVolumePercent: moduleSettings.TIMERS.config.announcementVolume,
+        playCompletionTone: moduleSettings.TIMERS.config.playCompletionTone,
+        announcementAudioKey: timer.announcementAudioKey,
+      });
     }
-  }, [moduleSettings.TIMERS.config.announcementVolume, timers, now]);
+  }, [
+    moduleSettings.TIMERS.config.announcementVolume,
+    moduleSettings.TIMERS.config.playCompletionTone,
+    timers,
+    now,
+  ]);
 
   const runningTimers = useMemo(
     () =>

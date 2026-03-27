@@ -2,6 +2,10 @@ import type { IncomingMessage } from "http";
 import type { Socket } from "net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { prisma } from "@/lib/prisma";
+import {
+  buildTimerAnnouncementAudioKey,
+  buildTimerAnnouncementMessage,
+} from "@/lib/timer-announcement-audio";
 
 type TimerPayload = {
   id: string;
@@ -9,6 +13,7 @@ type TimerPayload = {
   durationSeconds: number;
   endsAt: string;
   greetingName: string | null;
+  announcementAudioKey: string;
 };
 
 type MirrorEvent =
@@ -43,6 +48,7 @@ type MirrorEvent =
   | {
       type: "timer_announcement_test";
       announcementVolume: number;
+      announcementAudioKey?: string | null;
     };
 
 type ConnectedClient = {
@@ -152,6 +158,12 @@ async function sendTimersSnapshot(client: ConnectedClient, mirrorId: string) {
         durationSeconds: timer.durationSeconds,
         endsAt: timer.endsAt.toISOString(),
         greetingName: timer.greetingName,
+        announcementAudioKey: buildTimerAnnouncementAudioKey(
+          buildTimerAnnouncementMessage({
+            greetingName: timer.greetingName,
+            durationSeconds: timer.durationSeconds,
+          }),
+        ),
       })),
     }),
   );

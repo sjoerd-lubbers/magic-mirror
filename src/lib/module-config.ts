@@ -39,6 +39,7 @@ export type TimersModuleConfig = {
   displayMode: "focus" | "list";
   showClockInFocus: boolean;
   announcementVolume: number;
+  playCompletionTone: boolean;
   layout: ModuleLayout;
 };
 
@@ -169,6 +170,7 @@ function defaultTimersConfig(): TimersModuleConfig {
     displayMode: "focus",
     showClockInFocus: false,
     announcementVolume: 100,
+    playCompletionTone: false,
     layout: defaultLayout("TIMERS"),
   };
 }
@@ -367,6 +369,10 @@ function normalizeTimersConfig(value: unknown, options?: NormalizeOptions): Time
       0,
       100,
     ),
+    playCompletionTone:
+      typeof value.playCompletionTone === "boolean"
+        ? value.playCompletionTone
+        : fallback.playCompletionTone,
     layout: normalizeLayout("TIMERS", value.layout, options),
   };
 }

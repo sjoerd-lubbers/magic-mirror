@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { userCanAccessMirror } from "@/lib/household";
+import {
+  TIMER_ANNOUNCEMENT_TEST_MESSAGE,
+  buildTimerAnnouncementAudioKey,
+  prepareTimerAnnouncementAudio,
+} from "@/lib/timer-announcement-audio";
 import { broadcastToMirror, getMirrorSubscriberCount } from "@/lib/ws-hub";
 
 export const runtime = "nodejs";
@@ -44,9 +49,24 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
+  let announcementAudioKey: string | null = buildTimerAnnouncementAudioKey(
+    TIMER_ANNOUNCEMENT_TEST_MESSAGE,
+  );
+
+  try {
+    await prepareTimerAnnouncementAudio(TIMER_ANNOUNCEMENT_TEST_MESSAGE);
+  } catch (error) {
+    console.error("Test announcement audio voorbereiden mislukt", {
+      mirrorId,
+      error,
+    });
+    announcementAudioKey = null;
+  }
+
   broadcastToMirror(mirrorId, {
     type: "timer_announcement_test",
     announcementVolume: parsed.data.announcementVolume,
+    announcementAudioKey,
   });
 
   return NextResponse.json({
