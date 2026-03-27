@@ -1,4 +1,3 @@
-import "server-only";
 import { execFile } from "child_process";
 import { mkdir, readFile, rename, rm, stat } from "fs/promises";
 import path from "path";

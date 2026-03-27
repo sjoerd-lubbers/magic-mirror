@@ -1,4 +1,3 @@
-import "server-only";
 import crypto from "crypto";
 
 const TIMER_TTS_VOICE_ID = "espeak-ng:nl:145:ffmpeg-mp3:v1";
