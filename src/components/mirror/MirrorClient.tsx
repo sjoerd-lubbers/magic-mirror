@@ -21,6 +21,23 @@ type TimerView = {
   greetingName: string | null;
 };
 
+function speakDutchTimerAnnouncement(message: string, announcementVolumePercent: number) {
+  if (!("speechSynthesis" in window)) {
+    return;
+  }
+
+  const announcementVolume = Math.max(0, Math.min(1, announcementVolumePercent / 100));
+
+  if (announcementVolume <= 0) {
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = "nl-NL";
+  utterance.volume = announcementVolume;
+  window.speechSynthesis.speak(utterance);
+}
+
 type MirrorClientProps = {
   mirrorId: string;
   mirrorName: string;
@@ -279,6 +296,7 @@ export function MirrorClient({
               timers?: TimerView[];
               timerId?: string;
               mirrorId?: string;
+              announcementVolume?: number;
             }
           | null = null;
 
@@ -299,6 +317,7 @@ export function MirrorClient({
             timers?: TimerView[];
             timerId?: string;
             mirrorId?: string;
+            announcementVolume?: number;
           };
         } catch {
           payload = null;
@@ -326,6 +345,16 @@ export function MirrorClient({
         if (payload?.type === "timer_canceled" && typeof payload.timerId === "string") {
           setTimers((current) => current.filter((timer) => timer.id !== payload.timerId));
           announcedIdsRef.current.delete(payload.timerId);
+        }
+
+        if (
+          payload?.type === "timer_announcement_test" &&
+          typeof payload.announcementVolume === "number"
+        ) {
+          speakDutchTimerAnnouncement(
+            "Dit is een test van het timer meldvolume.",
+            payload.announcementVolume,
+          );
         }
 
         if (
@@ -532,19 +561,15 @@ export function MirrorClient({
 
       announcedIdsRef.current.add(timer.id);
 
-      if ("speechSynthesis" in window) {
-        const greetingName = timer.greetingName ?? "daar";
-        const durationLabel =
-          timer.durationSeconds < 60
-            ? `${timer.durationSeconds} seconden`
-            : `${Math.round(timer.durationSeconds / 60)} minuten`;
-        const message = `Hoi ${greetingName}, de timer van ${durationLabel} is klaar.`;
-        const utterance = new SpeechSynthesisUtterance(message);
-        utterance.lang = "nl-NL";
-        window.speechSynthesis.speak(utterance);
-      }
+      const greetingName = timer.greetingName ?? "daar";
+      const durationLabel =
+        timer.durationSeconds < 60
+          ? `${timer.durationSeconds} seconden`
+          : `${Math.round(timer.durationSeconds / 60)} minuten`;
+      const message = `Hoi ${greetingName}, de timer van ${durationLabel} is klaar.`;
+      speakDutchTimerAnnouncement(message, moduleSettings.TIMERS.config.announcementVolume);
     }
-  }, [timers, now]);
+  }, [moduleSettings.TIMERS.config.announcementVolume, timers, now]);
 
   const runningTimers = useMemo(
     () =>

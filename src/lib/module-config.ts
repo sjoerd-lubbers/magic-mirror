@@ -38,6 +38,7 @@ export type TimersModuleConfig = {
   maxVisible: number;
   displayMode: "focus" | "list";
   showClockInFocus: boolean;
+  announcementVolume: number;
   layout: ModuleLayout;
 };
 
@@ -167,6 +168,7 @@ function defaultTimersConfig(): TimersModuleConfig {
     maxVisible: 6,
     displayMode: "focus",
     showClockInFocus: false,
+    announcementVolume: 100,
     layout: defaultLayout("TIMERS"),
   };
 }
@@ -360,6 +362,11 @@ function normalizeTimersConfig(value: unknown, options?: NormalizeOptions): Time
       typeof value.showClockInFocus === "boolean"
         ? value.showClockInFocus
         : fallback.showClockInFocus,
+    announcementVolume: clamp(
+      toInt(value.announcementVolume, fallback.announcementVolume),
+      0,
+      100,
+    ),
     layout: normalizeLayout("TIMERS", value.layout, options),
   };
 }

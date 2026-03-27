@@ -41,7 +41,7 @@ const LABELS: Record<MirrorModuleType, string> = {
 };
 
 type SaveState = {
-  busy: boolean;
+  busyAction: "save" | "test" | null;
   error: string | null;
   info: string | null;
 };
@@ -76,12 +76,12 @@ export function MirrorModuleToggles({
   const [saveStateByType, setSaveStateByType] = useState<
     Record<MirrorModuleType, SaveState>
   >({
-    CLOCK: { busy: false, error: null, info: null },
-    WEATHER: { busy: false, error: null, info: null },
-    TIMERS: { busy: false, error: null, info: null },
-    CALENDAR: { busy: false, error: null, info: null },
-    ATTENTION: { busy: false, error: null, info: null },
-    TODOIST: { busy: false, error: null, info: null },
+    CLOCK: { busyAction: null, error: null, info: null },
+    WEATHER: { busyAction: null, error: null, info: null },
+    TIMERS: { busyAction: null, error: null, info: null },
+    CALENDAR: { busyAction: null, error: null, info: null },
+    ATTENTION: { busyAction: null, error: null, info: null },
+    TODOIST: { busyAction: null, error: null, info: null },
   });
 
   const modulesByType = useMemo(
@@ -122,7 +122,7 @@ export function MirrorModuleToggles({
       return;
     }
 
-    setSaveState(type, { busy: true, error: null, info: null });
+    setSaveState(type, { busyAction: "save", error: null, info: null });
 
     const response = await fetch(`/api/mirrors/${mirrorId}/modules`, {
       method: "POST",
@@ -136,7 +136,7 @@ export function MirrorModuleToggles({
       }),
     });
 
-    setSaveState(type, { busy: false });
+    setSaveState(type, { busyAction: null });
 
     const payload = (await response.json().catch(() => null)) as
       | {
@@ -171,6 +171,48 @@ export function MirrorModuleToggles({
     setSaveState(type, { info: "Opgeslagen", error: null });
     window.setTimeout(() => {
       setSaveState(type, { info: null });
+    }, 1500);
+  }
+
+  async function testTimerAnnouncement(config: TimersModuleConfig) {
+    setSaveState("TIMERS", {
+      busyAction: "test",
+      error: null,
+      info: null,
+    });
+
+    const response = await fetch(`/api/mirrors/${mirrorId}/timer-announcement-test`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        announcementVolume: config.announcementVolume,
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          error?: string;
+        }
+      | null;
+
+    if (!response.ok) {
+      setSaveState("TIMERS", {
+        busyAction: null,
+        error: payload?.error ?? "Testmelding versturen mislukt",
+        info: null,
+      });
+      return;
+    }
+
+    setSaveState("TIMERS", {
+      busyAction: null,
+      error: null,
+      info: "Testmelding verstuurd",
+    });
+    window.setTimeout(() => {
+      setSaveState("TIMERS", { info: null });
     }, 1500);
   }
 
@@ -289,10 +331,22 @@ export function MirrorModuleToggles({
                     type="button"
                     className="button-link button-small"
                     onClick={() => saveModule(module.type)}
-                    disabled={saveState.busy}
+                    disabled={saveState.busyAction !== null}
                   >
-                    {saveState.busy ? "Opslaan..." : "Opslaan"}
+                    {saveState.busyAction === "save" ? "Opslaan..." : "Opslaan"}
                   </button>
+                  {module.type === "TIMERS" ? (
+                    <button
+                      type="button"
+                      className="button-link button-small"
+                      onClick={() =>
+                        testTimerAnnouncement(module.config as TimersModuleConfig)
+                      }
+                      disabled={saveState.busyAction !== null}
+                    >
+                      {saveState.busyAction === "test" ? "Testen..." : "Test melding"}
+                    </button>
+                  ) : null}
                   {saveState.error ? <p className="notice error">{saveState.error}</p> : null}
                   {saveState.info ? <p className="notice success">{saveState.info}</p> : null}
                 </div>
@@ -582,6 +636,28 @@ function TimerSettings({
         />
         <span>Toon grote klok in focusmodus</span>
       </label>
+
+      <label>
+        Meldvolume
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={config.announcementVolume}
+          onChange={(event) =>
+            onChange({
+              ...config,
+              announcementVolume: toNumber(event.target.value, config.announcementVolume),
+            })
+          }
+        />
+        <span>{config.announcementVolume}%</span>
+      </label>
+
+      <p className="muted">
+        Gebruik &apos;Test melding&apos; om dit volume direct op de spiegel te horen.
+      </p>
 
       <LayoutEditor
         layout={config.layout}

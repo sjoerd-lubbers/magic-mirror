@@ -39,6 +39,10 @@ type MirrorEvent =
         showAlignmentGrid?: boolean;
         gridRows?: number;
       };
+    }
+  | {
+      type: "timer_announcement_test";
+      announcementVolume: number;
     };
 
 type ConnectedClient = {
