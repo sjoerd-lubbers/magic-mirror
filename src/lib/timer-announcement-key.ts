@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const TIMER_TTS_VOICE_ID = "espeak-ng:nl:145:ffmpeg-mp3:v1";
+const TIMER_TTS_VOICE_ID = "piper:nl_NL-ronnie-medium:q4:ffmpeg-mp3:v1";
 
 function normalizeMessage(message: string) {
   return message.trim().replace(/\s+/g, " ").slice(0, 200);

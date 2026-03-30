@@ -15,6 +15,11 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Audio niet gevonden" }, { status: 404 });
   }
 
+  console.info("Timer announcement audio geserveerd", {
+    key,
+    bytes: audio.byteLength,
+  });
+
   return new NextResponse(audio, {
     status: 200,
     headers: {

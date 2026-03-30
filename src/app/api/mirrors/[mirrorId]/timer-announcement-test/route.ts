@@ -61,6 +61,11 @@ export async function POST(request: Request, { params }: Params) {
     announcementAudioKey = null;
   }
 
+  console.info("Timer announcement test broadcast voorbereid", {
+    mirrorId,
+    announcementAudioKey,
+  });
+
   broadcastToMirror(mirrorId, {
     type: "timer_announcement_test",
     announcementVolume: parsed.data.announcementVolume,

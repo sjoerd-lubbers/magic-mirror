@@ -61,7 +61,7 @@ Het product is functioneel als eerste release:
 - uitlijnraster aan/uit
 - raster-rijen schakelbaar (12..24)
 - timer melding via browser TTS (`nl-NL`)
-- timer melding kan ook server-side als MP3 voorbereid worden via `espeak-ng` + `ffmpeg`
+- timer melding kan ook server-side als MP3 voorbereid worden via `Piper` + `ffmpeg`
 
 ## Belangrijke routes
 
