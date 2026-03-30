@@ -12,6 +12,7 @@ import {
 } from "@/lib/module-config";
 import {
   TIMER_ANNOUNCEMENT_TEST_MESSAGE,
+  buildTimerAnnouncementMessage,
   buildTimerAnnouncementAudioUrl,
 } from "@/lib/timer-announcement";
 import type { TodoistModuleData } from "@/lib/todoist";
@@ -29,6 +30,7 @@ type TimerView = {
 let activeAnnouncementAudio: HTMLAudioElement | null = null;
 let activeAnnouncementAudioUrl: string | null = null;
 let activeAnnouncementAudioContext: AudioContext | null = null;
+const TIMER_ANNOUNCEMENT_LEAD_MS = 8_000;
 
 function getAudioContextConstructor() {
   if ("AudioContext" in window) {
@@ -781,18 +783,16 @@ export function MirrorClient({
         continue;
       }
 
-      if (new Date(timer.endsAt).getTime() > Date.now()) {
+      if (new Date(timer.endsAt).getTime() - Date.now() > TIMER_ANNOUNCEMENT_LEAD_MS) {
         continue;
       }
 
       announcedIdsRef.current.add(timer.id);
 
-      const greetingName = timer.greetingName ?? "daar";
-      const durationLabel =
-        timer.durationSeconds < 60
-          ? `${timer.durationSeconds} seconden`
-          : `${Math.round(timer.durationSeconds / 60)} minuten`;
-      const message = `Hoi ${greetingName}, de timer van ${durationLabel} is klaar.`;
+      const message = buildTimerAnnouncementMessage({
+        greetingName: timer.greetingName,
+        durationSeconds: timer.durationSeconds,
+      });
       void announceTimerCompletion({
         message,
         announcementVolumePercent: moduleSettings.TIMERS.config.announcementVolume,

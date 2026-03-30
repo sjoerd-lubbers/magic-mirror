@@ -22,5 +22,5 @@ export function buildTimerAnnouncementMessage({
 }) {
   const safeGreetingName = greetingName?.trim() || "daar";
   const durationLabel = formatTimerAnnouncementDurationLabel(durationSeconds);
-  return `Hoi ${safeGreetingName}, de timer van ${durationLabel} is klaar.`;
+  return `Hoi ${safeGreetingName}, de wekker van ${durationLabel} is voorbij.`;
 }
