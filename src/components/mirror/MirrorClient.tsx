@@ -28,6 +28,7 @@ type TimerView = {
 
 let activeAnnouncementAudio: HTMLAudioElement | null = null;
 let activeAnnouncementAudioUrl: string | null = null;
+let activeAnnouncementAudioContext: AudioContext | null = null;
 
 function getAudioContextConstructor() {
   if ("AudioContext" in window) {
@@ -126,6 +127,11 @@ function resetActiveAnnouncementAudio() {
     URL.revokeObjectURL(activeAnnouncementAudioUrl);
     activeAnnouncementAudioUrl = null;
   }
+
+  if (activeAnnouncementAudioContext) {
+    void activeAnnouncementAudioContext.close().catch(() => undefined);
+    activeAnnouncementAudioContext = null;
+  }
 }
 
 async function playPreparedAnnouncementAudio(
@@ -146,34 +152,43 @@ async function playPreparedAnnouncementAudio(
     return false;
   }
 
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const audio = new Audio(objectUrl);
-  audio.volume = announcementVolume;
-  audio.preload = "auto";
+  const AudioContextConstructor = getAudioContextConstructor();
 
-  resetActiveAnnouncementAudio();
-  activeAnnouncementAudio = audio;
-  activeAnnouncementAudioUrl = objectUrl;
+  if (!AudioContextConstructor) {
+    return false;
+  }
 
-  audio.addEventListener(
-    "ended",
-    () => {
-      if (activeAnnouncementAudio === audio) {
-        resetActiveAnnouncementAudio();
-      }
-    },
-    { once: true },
-  );
+  const arrayBuffer = await response.arrayBuffer();
+  const audioContext = new AudioContextConstructor();
 
   try {
-    await audio.play();
+    await audioContext.resume();
+
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    const source = audioContext.createBufferSource();
+    const gain = audioContext.createGain();
+    gain.gain.value = announcementVolume;
+
+    source.buffer = audioBuffer;
+    source.connect(gain);
+    gain.connect(audioContext.destination);
+
+    resetActiveAnnouncementAudio();
+    activeAnnouncementAudioContext = audioContext;
+    source.start();
+    source.addEventListener(
+      "ended",
+      () => {
+        if (activeAnnouncementAudioContext === audioContext) {
+          resetActiveAnnouncementAudio();
+        }
+      },
+      { once: true },
+    );
+
     return true;
   } catch {
-    if (activeAnnouncementAudio === audio) {
-      resetActiveAnnouncementAudio();
-    }
-
+    await audioContext.close().catch(() => undefined);
     return false;
   }
 }
@@ -217,8 +232,15 @@ async function announceTimerCompletion({
     );
 
     if (started) {
+      console.info("Timer announcement gebruikt voorbereide audio", {
+        announcementAudioKey,
+      });
       return;
     }
+
+    console.warn("Timer announcement valt terug op browser-spraak", {
+      announcementAudioKey,
+    });
   }
 
   speakDutchTimerAnnouncement(message, announcementVolumePercent);
